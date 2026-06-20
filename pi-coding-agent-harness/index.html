@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anatomy of a Coding Agent Harness — Building Pi From Scratch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+:root{--bg:#faf9f6;--bg2:#f3f1ec;--bg3:#eceae4;--text:#1c1c1a;--muted:#7a7870;--border:#e2dfd8;--accent:#c4622d;--accent-light:#fdf0e8;--blue:#2a5db0;--blue-light:#eef3fc;--green:#1a7a4a;--green-light:#eaf5ee;--purple:#6b3fa0;--purple-light:#f2ecfa;--code-bg:#f5f3ee;--ink:#211f1b;}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{font-size:18px;scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'Lora',serif;-webkit-font-smoothing:antialiased;line-height:1;}
+.container{max-width:760px;margin:0 auto;padding:0 2rem;}
+.wide{max-width:1000px;margin:0 auto;padding:0 2rem;}
+
+header{border-bottom:1px solid var(--border);padding:0 2rem;position:sticky;top:0;z-index:100;background:rgba(250,249,246,0.95);backdrop-filter:blur(6px);}
+.header-inner{max-width:1000px;margin:0 auto;padding:1rem 0;display:flex;align-items:center;justify-content:space-between;gap:1rem;}
+.back-link{font-family:'DM Sans',sans-serif;font-size:0.78rem;color:var(--muted);text-decoration:none;transition:color .15s;}
+.back-link:hover{color:var(--accent);}
+
+.progress-bar{height:2px;background:var(--border);position:fixed;top:0;left:0;right:0;z-index:200;}
+.progress-fill{height:100%;background:var(--accent);width:0%;transition:width .1s;}
+
+.masthead{padding:5rem 0 3rem;border-bottom:1px solid var(--border);}
+.post-meta{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;font-family:'DM Sans',sans-serif;flex-wrap:wrap;}
+.post-category{font-size:0.72rem;color:var(--accent);background:var(--accent-light);padding:3px 9px;border-radius:3px;font-family:'DM Mono',monospace;letter-spacing:.05em;text-transform:uppercase;}
+.post-date,.post-read{font-size:0.8rem;color:var(--muted);}
+h1.post-title{font-family:'Lora',serif;font-size:clamp(2rem,5vw,3rem);font-weight:500;line-height:1.13;letter-spacing:-.02em;margin-bottom:1.2rem;}
+.post-subtitle{font-size:1.12rem;line-height:1.65;color:var(--muted);font-style:italic;max-width:620px;}
+
+.prose{padding:2.5rem 0;}
+.section-marker{font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.8rem;margin-top:4.5rem;display:block;}
+h2{font-family:'Lora',serif;font-size:1.7rem;font-weight:500;line-height:1.3;letter-spacing:-.015em;margin-bottom:1.2rem;color:var(--text);}
+h3{font-family:'Lora',serif;font-size:1.22rem;font-weight:600;font-style:italic;margin-top:2.4rem;margin-bottom:.8rem;color:var(--text);}
+h4{font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:600;letter-spacing:.02em;margin-top:1.8rem;margin-bottom:.6rem;color:var(--text);}
+p{font-size:1rem;line-height:1.78;margin-bottom:1.2rem;color:#2a2a28;}
+li{font-size:1rem;line-height:1.7;color:#2a2a28;}
+ul,ol{margin:0 0 1.3rem 1.3rem;}
+li{margin-bottom:.45rem;}
+strong{font-weight:600;color:var(--text);}
+em{font-style:italic;}
+a.ilink{color:var(--blue);text-decoration:none;border-bottom:1px solid rgba(42,93,176,.3);}
+a.ilink:hover{border-color:var(--blue);}
+code{font-family:'DM Mono',monospace;font-size:.8em;background:var(--code-bg);padding:1px 5px;border-radius:3px;color:var(--accent);word-break:break-word;}
+.section-sep{border:none;border-top:1px solid var(--border);margin:4rem 0;}
+sup{font-size:.65em;color:var(--blue);cursor:pointer;}
+sup a{color:inherit;text-decoration:none;}
+
+/* ── TOC ── */
+.toc{background:var(--bg2);border:1px solid var(--border);padding:1.6rem 2rem;margin:3rem 0;}
+.toc-title{font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem;}
+.toc ol{list-style:none;counter-reset:toc;margin:0;}
+.toc li{counter-increment:toc;margin-bottom:.5rem;display:flex;gap:.6rem;align-items:baseline;}
+.toc li::before{content:counter(toc,decimal-leading-zero);font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--accent);flex-shrink:0;}
+.toc a{font-family:'DM Sans',sans-serif;font-size:0.92rem;color:var(--text);text-decoration:none;}
+.toc a:hover{color:var(--accent);}
+.toc .toc-sub{font-size:.8rem;color:var(--muted);margin-left:.4rem;}
+
+/* ── callouts ── */
+.callout{border-left:3px solid var(--border);padding:.9rem 1.3rem;margin:1.8rem 0;background:var(--bg2);}
+.callout.note{border-color:var(--blue);background:var(--blue-light);}
+.callout.insight{border-color:var(--accent);background:var(--accent-light);}
+.callout.warn{border-color:#c0392b;background:#fef0ee;}
+.callout.result{border-color:var(--green);background:var(--green-light);}
+.callout-label{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem;}
+.callout p{font-size:.92rem;margin-bottom:0;line-height:1.68;}
+.callout p+p{margin-top:.7rem;}
+
+/* ── code blocks ── */
+.code{background:var(--ink);border-radius:5px;margin:1.7rem 0;overflow:hidden;border:1px solid #2f2c27;}
+.code-head{display:flex;align-items:center;gap:.6rem;padding:.5rem .9rem;background:#26231f;border-bottom:1px solid #34302a;}
+.code-dot{width:9px;height:9px;border-radius:50%;background:#4a453d;}
+.code-file{font-family:'DM Mono',monospace;font-size:.68rem;color:#b9b3a7;letter-spacing:.02em;margin-left:.3rem;}
+.code-lang{margin-left:auto;font-family:'DM Mono',monospace;font-size:.6rem;color:#7d766a;text-transform:uppercase;letter-spacing:.08em;}
+.code pre{margin:0;padding:1rem 1.1rem;overflow-x:auto;}
+.code code{font-family:'DM Mono',monospace;font-size:.76rem;line-height:1.62;background:none;color:#e6e2d8;padding:0;display:block;white-space:pre;}
+.code .c{color:#7d8a6f;font-style:italic;}/*comment*/
+.code .k{color:#d98a5b;}/*keyword*/
+.code .s{color:#9bbf86;}/*string*/
+.code .t{color:#6fa3d1;}/*type*/
+.code .f{color:#e0c285;}/*fn/prop*/
+.code .n{color:#c98fb0;}/*number/const*/
+.code .m{color:#8c857a;}/*muted*/
+
+/* ── inline file path tag ── */
+.fp{font-family:'DM Mono',monospace;font-size:.72rem;color:var(--muted);background:var(--bg3);padding:1px 6px;border-radius:3px;}
+
+/* ── tables ── */
+.dtable-wrap{margin:1.8rem 0;overflow-x:auto;border:1px solid var(--border);border-radius:4px;}
+table.dtable{border-collapse:collapse;width:100%;font-family:'DM Sans',sans-serif;font-size:.82rem;min-width:520px;}
+table.dtable th{background:var(--bg2);text-align:left;padding:.65rem .9rem;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;}
+table.dtable td{padding:.6rem .9rem;border-bottom:1px solid var(--border);color:#2f2e2b;vertical-align:top;line-height:1.5;}
+table.dtable tr:last-child td{border-bottom:none;}
+table.dtable td code{font-size:.92em;}
+table.dtable tr:nth-child(even) td{background:rgba(243,241,236,.4);}
+
+/* ── diagrams ── */
+.fig{margin:2.2rem 0;text-align:center;}
+.fig svg{max-width:100%;height:auto;}
+.fig-cap{font-family:'DM Sans',sans-serif;font-size:.78rem;color:var(--muted);line-height:1.55;margin-top:.9rem;max-width:640px;margin-left:auto;margin-right:auto;}
+.fig-label{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;justify-content:center;}
+
+/* ── ascii / flow blocks ── */
+.ascii{background:var(--code-bg);border:1px solid var(--border);border-radius:4px;padding:1.1rem 1.2rem;margin:1.7rem 0;overflow-x:auto;}
+.ascii pre{font-family:'DM Mono',monospace;font-size:.73rem;line-height:1.5;color:#3a382f;white-space:pre;margin:0;}
+.ascii .hl{color:var(--accent);font-weight:500;}
+.ascii .b{color:var(--blue);}
+.ascii .g{color:var(--green);}
+.ascii .p{color:var(--purple);}
+.ascii .mut{color:var(--muted);}
+
+/* ── key-term ── */
+.kt{font-weight:600;color:var(--text);}
+.lead{font-size:1.08rem;line-height:1.75;color:#33312d;}
+
+/* ── pillars grid ── */
+.pillars{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.8rem 0;}
+.pillar{border:1px solid var(--border);border-radius:4px;padding:1.1rem 1.2rem;background:var(--bg2);}
+.pillar-h{font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:600;margin-bottom:.4rem;color:var(--text);}
+.pillar-t{font-size:.84rem;line-height:1.6;color:var(--muted);font-family:'DM Sans',sans-serif;}
+@media(max-width:680px){.pillars{grid-template-columns:1fr;}}
+
+/* ── footnotes / footer ── */
+.footnotes{border-top:1px solid var(--border);padding-top:2rem;margin-top:4rem;}
+.footnotes-title{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem;}
+.footnote{font-size:.82rem;color:var(--muted);line-height:1.6;margin-bottom:.6rem;display:flex;gap:.5rem;}
+.fn-num{font-family:'DM Mono',monospace;font-size:.72rem;color:var(--blue);flex-shrink:0;}
+footer{border-top:1px solid var(--border);padding:2rem;margin-top:4rem;}
+.footer-inner{max-width:760px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;font-family:'DM Sans',sans-serif;font-size:.78rem;color:var(--muted);flex-wrap:wrap;gap:.8rem;}
+.footer-inner a{color:var(--muted);text-decoration:none;}
+.footer-inner a:hover{color:var(--accent);}
+
+::-webkit-scrollbar{width:7px;height:7px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+@media(max-width:680px){
+  html{font-size:16px;}
+  .masthead{padding:3rem 0 2rem;}
+  .code code{font-size:.7rem;}
+}
+  </style>
+</head>
+<body>
+
+<div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+<header>
+  <div class="header-inner">
+    <a href="../index.html" class="back-link">&larr; Distilled</a>
+    <span style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted)">AI Engineering &middot; 08</span>
+  </div>
+</header>
+
+<div class="masthead">
+  <div class="container">
+    <div class="post-meta">
+      <span class="post-category">AI Engineering</span>
+      <span class="post-date">2026</span>
+      <span class="post-read">~70 min read</span>
+    </div>
+    <h1 class="post-title">Anatomy of a Coding Agent Harness</h1>
+    <p class="post-subtitle">An LLM can write code. It cannot read your files, run your tests, or remember what it did five minutes ago. The harness is everything that turns a text predictor into an agent &mdash; and almost none of it is the model. A complete dissection of <em>Pi</em>, line by line.</p>
+  </div>
+</div>
+
+<div class="container">
+  <div class="prose">
+
+    <p class="lead">Strip a coding agent down to its core and you find a loop so small it fits on an index card: send the conversation to a model, read its reply, if it asked to run a tool then run it, append the result, and send the whole thing back. Repeat until the model stops asking for tools. That loop is maybe forty lines of code.</p>
+
+    <p>Everything else &mdash; and there is a <em>lot</em> of everything else &mdash; exists to make that loop survive contact with reality. Reality is that there are nine different LLM wire formats and they disagree about everything. Reality is that conversations grow past the context window. Reality is that tools fail, time out, and spawn child processes that refuse to die. Reality is that the user wants to interrupt mid-task, branch the conversation, resume it tomorrow, and watch a diff render in their terminal at sixty frames a second. The <span class="kt">harness</span> is the name for all of that machinery.</p>
+
+    <p>This piece dissects <a class="ilink" href="https://github.com/earendil-works/pi">Pi</a>, an open-source, MIT-licensed coding agent by earendil-works, read in full &mdash; not skimmed. Pi is an unusually clean specimen: a TypeScript monorepo of four packages with sharp boundaries, extensive design docs written for its own agent to read, and no framework magic hiding the moving parts. We will build the mental model bottom-up, quoting the actual source at every step. By the end you should be able to re-derive the architecture yourself, and recognize the same bones inside Claude Code, Codex, Cursor, or whatever you build next.</p>
+
+    <div class="callout note">
+      <div class="callout-label">How to read this</div>
+      <p>Each chapter is self-contained but they build in order: the provider layer holds up the agent loop, which holds up the orchestrator, which holds up sessions, tools, and the UI. Code is quoted verbatim from the repo with file paths. If you only read three chapters, read <strong>3 (the loop)</strong>, <strong>5 (the orchestrator)</strong>, and <strong>6 (sessions)</strong> &mdash; that is the spine.</p>
+    </div>
+
+    <nav class="toc">
+      <div class="toc-title">The thirteen chapters</div>
+      <ol>
+        <li><a href="#c1">What a Harness Actually Is</a> <span class="toc-sub">— the loop, the four layers, separation of concerns</span></li>
+        <li><a href="#c2">The Provider Layer</a> <span class="toc-sub">— one API for nine wire formats</span></li>
+        <li><a href="#c3">The Agent Loop</a> <span class="toc-sub">— the beating heart, ~40 lines</span></li>
+        <li><a href="#c4">The Stateful Agent</a> <span class="toc-sub">— transcript, events, steering, settlement</span></li>
+        <li><a href="#c5">The Orchestrator</a> <span class="toc-sub">— AgentHarness: phases, snapshots, hooks</span></li>
+        <li><a href="#c6">Sessions &amp; Persistence</a> <span class="toc-sub">— an append-only conversation tree</span></li>
+        <li><a href="#c7">Context Management &amp; Compaction</a> <span class="toc-sub">— surviving the context window</span></li>
+        <li><a href="#c8">The Tools</a> <span class="toc-sub">— bash, edit, read, and the file mutation queue</span></li>
+        <li><a href="#c9">System Prompt, Skills &amp; Context Files</a> <span class="toc-sub">— progressive disclosure</span></li>
+        <li><a href="#c10">Extensions &amp; the Hook System</a> <span class="toc-sub">— a self-extensible agent</span></li>
+        <li><a href="#c11">The Terminal UI</a> <span class="toc-sub">— differential rendering from scratch</span></li>
+        <li><a href="#c12">Modes: Interactive, Print, RPC, SDK</a> <span class="toc-sub">— the same engine, four faces</span></li>
+        <li><a href="#c13">The Design Principles</a> <span class="toc-sub">— what makes it hold together</span></li>
+      </ol>
+    </nav>
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 1 -->
+    <span class="section-marker" id="c1">01 &mdash; The Mental Model</span>
+    <h2>What a Coding Agent Harness Actually Is</h2>
+
+    <p>Start with the smallest true thing. A large language model is a function: text in, text out. It has no memory between calls, no ability to act on the world, and no concept of "files" or "your repository" beyond what appears in its input. Give it a coding task and it will happily emit code &mdash; but it is guessing into the void, unable to check whether the file it is editing even exists.</p>
+
+    <p>An <span class="kt">agent</span> is what you get when you close the loop: you let the model request <em>actions</em>, you execute those actions in the real world, and you feed the results back. The model says "read <code>config.ts</code>"; you read it and hand back the contents; now the model is no longer guessing. The mechanism that lets a model request actions is <span class="kt">tool calling</span> &mdash; the model emits a structured request (<code>{name: "read", arguments: {path: "config.ts"}}</code>) instead of prose, and the harness fulfills it.</p>
+
+    <div class="fig">
+      <div class="fig-label">Figure 1 &mdash; The core agentic loop</div>
+      <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" font-family="DM Sans, sans-serif">
+        <defs>
+          <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#7a7870"/></marker>
+        </defs>
+        <!-- user -->
+        <rect x="20" y="125" width="120" height="50" rx="6" fill="#eef3fc" stroke="#2a5db0"/>
+        <text x="80" y="148" text-anchor="middle" font-size="13" fill="#2a5db0" font-weight="600">User prompt</text>
+        <text x="80" y="164" text-anchor="middle" font-size="10" fill="#7a7870">"fix the bug"</text>
+        <!-- model -->
+        <rect x="230" y="40" width="160" height="70" rx="6" fill="#fdf0e8" stroke="#c4622d"/>
+        <text x="310" y="68" text-anchor="middle" font-size="13" fill="#c4622d" font-weight="600">LLM (provider)</text>
+        <text x="310" y="86" text-anchor="middle" font-size="10" fill="#7a7870">emits text + tool calls</text>
+        <text x="310" y="100" text-anchor="middle" font-size="10" fill="#7a7870">via streamSimple()</text>
+        <!-- decision -->
+        <path d="M460 75 L520 50 L580 75 L520 100 z" fill="#f2ecfa" stroke="#6b3fa0"/>
+        <text x="520" y="72" text-anchor="middle" font-size="11" fill="#6b3fa0" font-weight="600">tool</text>
+        <text x="520" y="86" text-anchor="middle" font-size="11" fill="#6b3fa0" font-weight="600">calls?</text>
+        <!-- tools -->
+        <rect x="600" y="160" width="140" height="70" rx="6" fill="#eaf5ee" stroke="#1a7a4a"/>
+        <text x="670" y="188" text-anchor="middle" font-size="13" fill="#1a7a4a" font-weight="600">Execute tools</text>
+        <text x="670" y="206" text-anchor="middle" font-size="10" fill="#7a7870">read / edit / bash…</text>
+        <text x="670" y="220" text-anchor="middle" font-size="10" fill="#7a7870">in the real world</text>
+        <!-- done -->
+        <rect x="450" y="235" width="140" height="45" rx="6" fill="#f3f1ec" stroke="#7a7870"/>
+        <text x="520" y="262" text-anchor="middle" font-size="12" fill="#1c1c1a" font-weight="600">Done → reply</text>
+        <!-- arrows -->
+        <path d="M140 150 C 180 150, 190 90, 228 80" fill="none" stroke="#7a7870" stroke-width="1.5" marker-end="url(#ah)"/>
+        <path d="M390 75 L456 75" fill="none" stroke="#7a7870" stroke-width="1.5" marker-end="url(#ah)"/>
+        <path d="M560 88 C 600 110, 640 130, 665 156" fill="none" stroke="#1a7a4a" stroke-width="1.5" marker-end="url(#ah)"/>
+        <text x="612" y="120" font-size="10" fill="#1a7a4a">yes</text>
+        <path d="M520 100 L520 232" fill="none" stroke="#7a7870" stroke-width="1.5" marker-end="url(#ah)"/>
+        <text x="528" y="150" font-size="10" fill="#7a7870">no</text>
+        <!-- loop back tool result -->
+        <path d="M600 195 C 430 250, 330 200, 312 114" fill="none" stroke="#1a7a4a" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+        <text x="380" y="200" font-size="10" fill="#1a7a4a">tool results appended → loop</text>
+      </svg>
+      <div class="fig-cap">The entire premise. The harness owns every box <em>except</em> the model. The dashed arrow &mdash; feeding tool results back and re-invoking the model &mdash; is the "agentic" part. Everything in later chapters is detail hung on this skeleton.</div>
+    </div>
+
+    <h3>The loop is small; the harness is large</h3>
+
+    <p>Here is the loop in pseudocode, which is genuinely close to what Pi runs:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">the agentic loop, conceptually</span><span class="code-lang">pseudo</span></div>
+<pre><code><span class="k">while</span> (<span class="n">true</span>) {
+  <span class="k">const</span> reply = <span class="k">await</span> model.<span class="f">stream</span>(systemPrompt, messages, tools)  <span class="c">// one LLM call = one "turn"</span>
+  messages.<span class="f">push</span>(reply)
+  <span class="k">const</span> toolCalls = reply.content.<span class="f">filter</span>(c => c.type === <span class="s">"toolCall"</span>)
+  <span class="k">if</span> (toolCalls.length === <span class="n">0</span>) <span class="k">break</span>                       <span class="c">// model is done → exit</span>
+  <span class="k">for</span> (<span class="k">const</span> call <span class="k">of</span> toolCalls) {
+    <span class="k">const</span> result = <span class="k">await</span> <span class="f">runTool</span>(call.name, call.arguments) <span class="c">// act on the world</span>
+    messages.<span class="f">push</span>({ role: <span class="s">"toolResult"</span>, toolCallId: call.id, ...result })
+  }
+}                                                       <span class="c">// loop: model now sees the results</span></code></pre>
+    </div>
+
+    <p>That is the whole idea. So why does Pi weigh in at four packages and tens of thousands of lines? Because each line of that pseudocode hides a swamp:</p>
+
+    <ul>
+      <li><code>model.stream(...)</code> &mdash; which model? Anthropic, OpenAI, Google, and a dozen OpenAI-compatible clones each have <em>different</em> request shapes, streaming formats, tool-call encodings, reasoning parameters, and authentication. <strong>Chapter 2.</strong></li>
+      <li><code>messages.push(reply)</code> &mdash; messages must be persisted so you can resume tomorrow, branched so you can explore alternatives, and <em>compacted</em> when they outgrow the context window. <strong>Chapters 6 &amp; 7.</strong></li>
+      <li><code>runTool(...)</code> &mdash; the tool might be <code>bash</code> spawning a process tree, or <code>edit</code> doing a surgical string replacement that must not race a concurrent write. Output might be 40&nbsp;MB. <strong>Chapter 8.</strong></li>
+      <li>The loop itself must be <em>interruptible</em> (the user wants to steer), <em>observable</em> (the UI must render streaming tokens), and <em>extensible</em> (third parties add tools and hooks). <strong>Chapters 3&ndash;5, 10&ndash;11.</strong></li>
+    </ul>
+
+    <p>The art of harness design is drawing boundaries so that each swamp is drained in isolation. Pi draws them as four packages.</p>
+
+    <h3>The four layers</h3>
+
+    <p>Pi is a monorepo (<span class="fp">packages/</span>) of four published packages, each depending only on the ones below it. This is the single most important diagram in the whole piece: it tells you where every responsibility lives.</p>
+
+    <div class="fig">
+      <div class="fig-label">Figure 2 &mdash; The four-layer architecture</div>
+      <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" font-family="DM Sans, sans-serif">
+        <!-- coding-agent -->
+        <rect x="40" y="20" width="640" height="78" rx="7" fill="#fdf0e8" stroke="#c4622d" stroke-width="1.5"/>
+        <text x="60" y="44" font-size="14" fill="#c4622d" font-weight="600">pi-coding-agent</text>
+        <text x="60" y="62" font-size="10.5" fill="#5a5852">The CLI you run. Built-in tools (bash/edit/read/…), system prompt, skills, sessions on</text>
+        <text x="60" y="77" font-size="10.5" fill="#5a5852">disk, extensions, slash commands, project trust, and four run-modes (interactive/print/rpc/sdk).</text>
+        <text x="612" y="90" font-size="9" fill="#b07a55" font-family="DM Mono">CH 6–12</text>
+        <!-- agent-core -->
+        <rect x="40" y="112" width="640" height="78" rx="7" fill="#eef3fc" stroke="#2a5db0" stroke-width="1.5"/>
+        <text x="60" y="136" font-size="14" fill="#2a5db0" font-weight="600">pi-agent-core</text>
+        <text x="60" y="154" font-size="10.5" fill="#5a5852">The runtime. The agent loop, the stateful Agent, the AgentHarness orchestrator, the session</text>
+        <text x="60" y="169" font-size="10.5" fill="#5a5852">tree, compaction, and the AgentMessage abstraction. Knows nothing about a terminal or files.</text>
+        <text x="612" y="182" font-size="9" fill="#5b81b8" font-family="DM Mono">CH 3–7</text>
+        <!-- ai -->
+        <rect x="40" y="204" width="640" height="78" rx="7" fill="#eaf5ee" stroke="#1a7a4a" stroke-width="1.5"/>
+        <text x="60" y="228" font-size="14" fill="#1a7a4a" font-weight="600">pi-ai</text>
+        <text x="60" y="246" font-size="10.5" fill="#5a5852">The provider layer. One unified message + streaming model mapped to ~25 providers across</text>
+        <text x="60" y="261" font-size="10.5" fill="#5a5852">9 APIs. Tool-schema validation, reasoning, prompt caching, OAuth, cross-provider handoff.</text>
+        <text x="612" y="274" font-size="9" fill="#5a9b76" font-family="DM Mono">CH 2</text>
+        <!-- tui -->
+        <rect x="40" y="296" width="640" height="50" rx="7" fill="#f2ecfa" stroke="#6b3fa0" stroke-width="1.5"/>
+        <text x="60" y="320" font-size="14" fill="#6b3fa0" font-weight="600">pi-tui</text>
+        <text x="280" y="318" font-size="10.5" fill="#5a5852">Standalone terminal UI library: differential rendering, components,</text>
+        <text x="280" y="332" font-size="10.5" fill="#5a5852">a line editor, key parsing. Used by coding-agent's interactive mode.</text>
+        <text x="612" y="328" font-size="9" fill="#8a6bb0" font-family="DM Mono">CH 11</text>
+      </svg>
+      <div class="fig-cap">Dependencies point downward only. <code>pi-ai</code> has no idea an agent exists; <code>pi-agent-core</code> has no idea a terminal exists. This is what lets the same runtime power a CLI, a browser app (proxying the provider layer), and an SDK. The strict layering is the reason the codebase stays comprehensible at scale.</div>
+    </div>
+
+    <div class="dtable-wrap">
+      <table class="dtable">
+        <thead><tr><th>Package</th><th>One-line job</th><th>Key exports</th><th>Depends on</th></tr></thead>
+        <tbody>
+          <tr><td><code>pi-ai</code></td><td>Unified multi-provider LLM API</td><td><code>streamSimple</code>, <code>getModel</code>, <code>Message</code>, <code>Tool</code></td><td>provider SDKs only</td></tr>
+          <tr><td><code>pi-agent-core</code></td><td>Tool-calling runtime &amp; state</td><td><code>agentLoop</code>, <code>Agent</code>, <code>AgentHarness</code>, <code>Session</code></td><td><code>pi-ai</code></td></tr>
+          <tr><td><code>pi-tui</code></td><td>Differential terminal rendering</td><td><code>TUI</code>, <code>Container</code>, components</td><td>nothing</td></tr>
+          <tr><td><code>pi-coding-agent</code></td><td>The actual <code>pi</code> CLI</td><td>tools, prompt, modes, extensions</td><td>all three above</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Three data types do most of the work</h3>
+
+    <p>Before any code, internalize the three types that flow through the whole system. Almost every chapter is about transforming between them.</p>
+
+    <div class="pillars">
+      <div class="pillar"><div class="pillar-h">Message (pi-ai)</div><div class="pillar-t">What the <em>model</em> understands. Exactly three roles: <code>user</code>, <code>assistant</code>, <code>toolResult</code>. Plain JSON, fully serializable. The lingua franca of every provider.</div></div>
+      <div class="pillar"><div class="pillar-h">AgentMessage (agent-core)</div><div class="pillar-t">A superset: every <code>Message</code> <em>plus</em> app-specific types (a bash-execution record, a UI notification, a compaction summary). The transcript is made of these.</div></div>
+      <div class="pillar"><div class="pillar-h">SessionTreeEntry (agent-core)</div><div class="pillar-t">What gets written to <em>disk</em>. A node in the conversation tree: a message, a model change, a compaction, a branch summary, a leaf pointer. Append-only.</div></div>
+    </div>
+
+    <p>The pipeline, which the rest of this piece elaborates, is: the session tree is read into <code>AgentMessage[]</code>; an optional transform prunes or injects; then a function called <code>convertToLlm</code> filters that down to the <code>Message[]</code> the provider layer accepts; the provider maps <em>that</em> to its wire format. Four representations, each earning its place. Keep this chain in mind:</p>
+
+    <div class="ascii">
+<pre><span class="mut">disk</span>                  <span class="mut">memory</span>                                <span class="mut">wire</span>
+SessionTreeEntry[]  ──►  AgentMessage[]  ──►  Message[]  ──►  provider JSON
+  <span class="mut">(append-only tree)</span>     <span class="mut">(transcript +</span>       <span class="mut">(LLM-only,</span>      <span class="mut">(Anthropic /</span>
+                        <span class="mut"> custom types)</span>       <span class="mut"> 3 roles)</span>        <span class="mut"> OpenAI / …)</span>
+       <span class="hl">buildContext()</span>      <span class="hl">transformContext()</span>     <span class="hl">convertToLlm()</span>    <span class="hl">provider.stream()</span>
+                        <span class="hl">+ compaction</span>          <span class="hl">+ hooks</span></pre>
+    </div>
+
+    <div class="callout insight">
+      <div class="callout-label">The thesis</div>
+      <p>A coding agent is <strong>5% model, 95% harness</strong>. The model is a stateless function you rent by the token. The harness is the operating system around it: it manages memory (context), I/O (tools), persistence (sessions), concurrency (the loop), drivers (providers), and the user interface. Judging an agent by its model is like judging a computer by its CPU. Pi is worth studying because it makes the other 95% legible.</p>
+    </div>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 2 -->
+    <span class="section-marker" id="c2">02 &mdash; The Foundation</span>
+    <h2>The Provider Layer: One API for Nine Wire Formats</h2>
+
+    <p>The bottom layer, <code>pi-ai</code>, exists to tell one lie convincingly: that there is a single kind of language model. There is not. There is Anthropic's Messages API, OpenAI's two different APIs (the older Completions and the newer Responses), Google's Gemini, Amazon Bedrock, and a long tail of OpenAI-compatible providers (xAI, Groq, DeepSeek, Together, Cerebras, OpenRouter, Mistral, Moonshot, &hellip;) that are compatible right up until they aren't. They disagree on request shape, streaming format, how tool calls are encoded, how "thinking" is represented, how prompts are cached, and how you authenticate. <code>pi-ai</code> absorbs all of it behind one function.</p>
+
+    <h3>The unified type model: plain serializable data</h3>
+
+    <p>The design decision that makes everything else possible: the canonical types are <em>plain JSON</em>, no classes, no methods. A whole conversation round-trips through <code>JSON.stringify</code>. Here is the spine, from <span class="fp">packages/ai/src/types.ts</span>:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/ai/src/types.ts</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">export interface</span> <span class="t">UserMessage</span> {
+  role: <span class="s">"user"</span>;
+  content: <span class="t">string</span> | (<span class="t">TextContent</span> | <span class="t">ImageContent</span>)[];
+  timestamp: <span class="t">number</span>;
+}
+<span class="k">export interface</span> <span class="t">AssistantMessage</span> {
+  role: <span class="s">"assistant"</span>;
+  content: (<span class="t">TextContent</span> | <span class="t">ThinkingContent</span> | <span class="t">ToolCall</span>)[]; <span class="c">// heterogeneous blocks</span>
+  api: <span class="t">Api</span>; provider: <span class="t">Provider</span>; model: <span class="t">string</span>;     <span class="c">// SELF-DESCRIBING</span>
+  usage: <span class="t">Usage</span>; stopReason: <span class="t">StopReason</span>; errorMessage?: <span class="t">string</span>;
+  timestamp: <span class="t">number</span>;
+}
+<span class="k">export interface</span> <span class="t">ToolResultMessage</span>&lt;<span class="t">TDetails</span> = <span class="k">any</span>&gt; {
+  role: <span class="s">"toolResult"</span>;
+  toolCallId: <span class="t">string</span>; toolName: <span class="t">string</span>;
+  content: (<span class="t">TextContent</span> | <span class="t">ImageContent</span>)[];  <span class="c">// text AND images back to the model</span>
+  isError: <span class="t">boolean</span>; timestamp: <span class="t">number</span>;
+}
+<span class="k">export type</span> <span class="t">Message</span> = <span class="t">UserMessage</span> | <span class="t">AssistantMessage</span> | <span class="t">ToolResultMessage</span>;</code></pre>
+    </div>
+
+    <p>Two choices here pay off for the rest of the system. First, the assistant message is <span class="kt">self-describing</span>: it records the <code>api</code>, <code>provider</code>, and <code>model</code> that produced it. That single fact is what makes <em>cross-provider handoff</em> possible &mdash; when you replay a transcript to a different model, the layer can tell "this was me" from "this was a foreign model" and handle reasoning blocks accordingly. Second, a tool call is just a <code>ToolCall</code> block <em>inside</em> the assistant's content array, and its result is a separate <code>toolResult</code> message keyed by <code>toolCallId</code>. This representation is provider-neutral; each provider maps it to its own native shape (Anthropic <code>tool_use</code>/<code>tool_result</code>, OpenAI <code>function_call</code>/<code>function_call_output</code>, Google <code>functionCall</code>/<code>functionResponse</code>).</p>
+
+    <p>Token accounting rides along on every assistant message. <code>Usage</code> tracks <code>input</code>, <code>output</code>, <code>cacheRead</code>, <code>cacheWrite</code> (with a separate <code>cacheWrite1h</code> for Anthropic's 1-hour cache, billed at 2&times;), plus a computed <code>cost</code> breakdown in dollars. The harness reads these numbers to decide when to compact (Chapter 7) and to render the footer (Chapter 11).</p>
+
+    <h3>Streaming: errors are values, not exceptions</h3>
+
+    <p>The single most important abstraction in <code>pi-ai</code> is <code>EventStream</code> &mdash; a push/pull bridge that decouples the provider's network read-loop from the consumer's iteration. A provider pushes events as they arrive off the wire; a consumer either <code>for await</code>s them or just awaits a final <code>.result()</code>. The same object is both an async-iterable and a promise.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/ai/src/utils/event-stream.ts</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">export class</span> <span class="t">EventStream</span>&lt;<span class="t">T</span>, <span class="t">R</span> = <span class="t">T</span>&gt; <span class="k">implements</span> <span class="t">AsyncIterable</span>&lt;<span class="t">T</span>&gt; {
+  <span class="k">private</span> queue: <span class="t">T</span>[] = [];
+  <span class="k">private</span> waiting: ((v: <span class="t">IteratorResult</span>&lt;<span class="t">T</span>&gt;) => <span class="t">void</span>)[] = [];
+  <span class="k">private</span> finalResultPromise: <span class="t">Promise</span>&lt;<span class="t">R</span>&gt;;
+
+  <span class="f">push</span>(event: <span class="t">T</span>): <span class="t">void</span> {
+    <span class="k">if</span> (<span class="k">this</span>.<span class="f">isComplete</span>(event)) {              <span class="c">// terminal event…</span>
+      <span class="k">this</span>.<span class="f">resolveFinalResult</span>(<span class="k">this</span>.<span class="f">extractResult</span>(event)); <span class="c">// …resolves result()</span>
+    }
+    <span class="k">const</span> waiter = <span class="k">this</span>.waiting.<span class="f">shift</span>();
+    <span class="k">if</span> (waiter) <span class="f">waiter</span>({ value: event, done: <span class="n">false</span> }); <span class="c">// hand to a pending consumer</span>
+    <span class="k">else</span> <span class="k">this</span>.queue.<span class="f">push</span>(event);                  <span class="c">// or buffer it</span>
+  }
+  <span class="f">result</span>(): <span class="t">Promise</span>&lt;<span class="t">R</span>&gt; { <span class="k">return</span> <span class="k">this</span>.finalResultPromise; }
+}</code></pre>
+    </div>
+
+    <p>The concrete subclass, <code>AssistantMessageEventStream</code>, sets the terminal condition to a <code>done</code> or <code>error</code> event and extracts the final <code>AssistantMessage</code>. This yields two superpowers. (1) <code>complete()</code> is literally <code>stream().result()</code> &mdash; non-streaming is a free special case of streaming. (2) <strong>Failures never throw out of the stream function.</strong> A network error, a timeout, an abort &mdash; all become a terminal <code>error</code> event carrying a fully-formed <code>AssistantMessage</code> with <code>stopReason: "error" | "aborted"</code>, partial content, and partial usage. The agent loop above never needs a <code>try/catch</code> around the model call; it just checks <code>stopReason</code>. This "errors as values" contract is written into the type:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/agent/src/types.ts — the StreamFn contract</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="c">/**
+ * Contract:
+ * - Must not throw or return a rejected promise for request/model/runtime failures.
+ * - Must return an AssistantMessageEventStream.
+ * - Failures must be encoded in the returned stream via protocol events and a
+ *   final AssistantMessage with stopReason "error" or "aborted" and errorMessage.
+ */</span>
+<span class="k">export type</span> <span class="t">StreamFn</span> = (...args: <span class="t">Parameters</span>&lt;<span class="k">typeof</span> streamSimple&gt;) => <span class="t">ReturnType</span>&lt;<span class="k">typeof</span> streamSimple&gt;;</code></pre>
+    </div>
+
+    <p>The event protocol itself is a tagged union: <code>start</code>, then deltas (<code>text_delta</code>, <code>thinking_delta</code>, <code>toolcall_delta</code>, each with a <code>contentIndex</code> tying it to a block), then <code>done</code> or <code>error</code>. Every event after <code>start</code> carries <code>partial</code> &mdash; the same message object being assembled in place &mdash; so a UI can read the full accumulated message at any moment. Blocks can <em>interleave</em> (a thinking delta, then a text delta, then back), so consumers key off <code>contentIndex</code> rather than assuming order.</p>
+
+    <h3>Two tiers of options: native vs. simple</h3>
+
+    <p>There are two entry points, and the split is the central abstraction seam of the package. <code>stream()</code> / <code>complete()</code> take <em>provider-native</em> options (e.g. Anthropic's <code>thinkingEnabled</code>). <code>streamSimple()</code> / <code>completeSimple()</code> take a unified <code>SimpleStreamOptions</code> whose one reasoning knob is <code>reasoning: ThinkingLevel</code> &mdash; an enum of <code>"off" | "minimal" | "low" | "medium" | "high" | "xhigh"</code>. The agent loop only ever calls <code>streamSimple</code>; each provider maps that single level into its idiosyncratic thinking parameters. That is why agent-core code is provider-agnostic.</p>
+
+    <div class="dtable-wrap">
+      <table class="dtable">
+        <thead><tr><th>Concern</th><th>Anthropic</th><th>OpenAI Responses</th><th>OpenAI Completions</th><th>Google</th></tr></thead>
+        <tbody>
+          <tr><td>Reasoning param</td><td><code>thinking.budget_tokens</code> or adaptive <code>effort</code></td><td><code>reasoning.effort</code></td><td>~10 dialects via <code>thinkingFormat</code></td><td><code>thinking.level</code> or <code>budgetTokens</code></td></tr>
+          <tr><td>System prompt</td><td>array of text blocks</td><td><code>developer</code> role (reasoning models)</td><td><code>system</code>/<code>developer</code></td><td><code>systemInstruction</code></td></tr>
+          <tr><td>Tool-call ID</td><td><code>^[a-zA-Z0-9_-]+$</code>, ≤64</td><td>composite <code>call_id|item_id</code></td><td>≤40 chars</td><td>often none (name-keyed)</td></tr>
+          <tr><td>Thinking replay</td><td>signed <code>thinking</code> block</td><td>JSON reasoning item</td><td>field-named (<code>reasoning_content</code>…)</td><td><code>thoughtSignature</code> on any part</td></tr>
+          <tr><td>SSE parsing</td><td>hand-written decoder</td><td>SDK typed iterator</td><td>SDK iterator</td><td>genai stream</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>The hardest problem: cross-provider message replay</h3>
+
+    <p>Every provider funnels the canonical <code>Message[]</code> through one shared function, <code>transformMessages</code> (<span class="fp">packages/ai/src/providers/transform-messages.ts</span>), before emitting its wire format. This is where the worst correctness bugs are concentrated &mdash; and centralized so they're solved once. It does five things: (1) downgrades images to text placeholders if the model lacks vision; (2) decides per assistant message whether it is the <em>same</em> model or a <em>foreign</em> one; (3) handles thinking blocks accordingly; (4) normalizes tool-call IDs (and rewrites the matching results); (5) synthesizes results for orphaned tool calls and drops errored turns.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">transform-messages.ts — the same-vs-foreign thinking rule</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">const</span> isSameModel =
+  assistantMsg.provider === model.provider &amp;&amp;
+  assistantMsg.api === model.api &amp;&amp;
+  assistantMsg.model === model.id;
+
+<span class="k">if</span> (block.type === <span class="s">"thinking"</span>) {
+  <span class="k">if</span> (block.redacted) <span class="k">return</span> isSameModel ? block : [];   <span class="c">// drop foreign redacted</span>
+  <span class="k">if</span> (isSameModel &amp;&amp; block.thinkingSignature) <span class="k">return</span> block; <span class="c">// keep signed (even if empty)</span>
+  <span class="k">if</span> (!block.thinking?.<span class="f">trim</span>()) <span class="k">return</span> [];                <span class="c">// drop empty</span>
+  <span class="k">if</span> (isSameModel) <span class="k">return</span> block;
+  <span class="k">return</span> { type: <span class="s">"text"</span>, text: block.thinking };          <span class="c">// foreign → plain text</span>
+}</code></pre>
+    </div>
+
+    <p>So Claude's cryptographically-signed thinking is preserved verbatim when replayed to the same Claude model, but degraded to ordinary text when you hand the conversation to GPT or Gemini &mdash; which would otherwise reject the unrecognized signature. The orphaned-tool-call pass is equally pragmatic: any tool call lacking a result gets a synthetic <code>"No result provided"</code> error injected, because most APIs reject an unpaired tool call outright.</p>
+
+    <h3>Lazy registration and the bundle-size story</h3>
+
+    <p>Two registries hold the system together. A <span class="kt">model registry</span> (built from an auto-generated 450&nbsp;KB table of model metadata) answers <code>getModel("anthropic", "claude-sonnet-4-6")</code> with a fully-typed <code>Model</code> object that <em>knows its own API</em>. An <span class="kt">API-provider registry</span> maps each API to its <code>{stream, streamSimple}</code> functions. Dispatch is trivial: <code>stream()</code> reads <code>model.api</code> and looks up the transport.</p>
+
+    <p>Crucially, providers register <em>lazily</em>. At import, each built-in API registers a thin wrapper whose real implementation sits behind a dynamic <code>import()</code>. The first call to a provider triggers a one-time load of that provider's SDK; until then it costs nothing. Combined with a <code>/base</code> entry point that skips built-in registration entirely, a browser bundle can include only the providers it actually uses &mdash; never pulling in, say, the AWS Bedrock SDK it will never call.</p>
+
+    <div class="callout note">
+      <div class="callout-label">Also in this layer</div>
+      <p><strong>Tool-schema validation</strong> with TypeBox: tool parameters are TypeBox schemas; arguments are coerced and validated with a cached compiled validator, and validation failures become a readable error string fed back to the model so it can retry. <strong>Prompt caching</strong>: Anthropic cache breakpoints land on the system prompt, the last tool definition, and the last message; OpenAI uses a <code>prompt_cache_key</code> derived from the session ID. <strong>OAuth</strong>: device-code and PKCE flows for Anthropic, OpenAI Codex, and GitHub Copilot, with token refresh. <strong>Overflow detection</strong>: ~22 regexes recognize "context too long" errors across providers so the harness can react. Each is a small, well-isolated module &mdash; the layer is broad but shallow.</p>
+    </div>
+
+    <p>With the foundation in place &mdash; a single <code>streamSimple(model, context, options)</code> that never throws and speaks every dialect &mdash; we can build the loop that calls it.</p>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 3 -->
+    <span class="section-marker" id="c3">03 &mdash; The Beating Heart</span>
+    <h2>The Agent Loop</h2>
+
+    <p>We have a model abstraction that never throws. Now the loop. In Pi this is <span class="fp">packages/agent/src/agent-loop.ts</span> &mdash; a single file, a few hundred lines, and the densest, most important code in the whole project. Everything above it (the stateful <code>Agent</code>, the <code>AgentHarness</code>, the CLI) is a progressively richer wrapper around this function. Read it once and the rest is commentary.</p>
+
+    <h3>AgentMessage vs Message: the two transcripts</h3>
+
+    <p>The loop works in <code>AgentMessage</code>, not the provider's <code>Message</code>. Why a second type? Because a coding agent's transcript contains things the model must never see in raw form &mdash; a UI-only notification, a record of a user-run bash command, a compaction summary marker. <code>AgentMessage</code> is the union of real LLM messages <em>plus</em> app-defined custom messages, extended through TypeScript declaration merging:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/agent/src/types.ts</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">export interface</span> <span class="t">CustomAgentMessages</span> {} <span class="c">// apps augment this via declaration merging</span>
+
+<span class="k">export type</span> <span class="t">AgentMessage</span> = <span class="t">Message</span> | <span class="t">CustomAgentMessages</span>[<span class="k">keyof</span> <span class="t">CustomAgentMessages</span>];
+
+<span class="c">// e.g. the coding agent adds, in packages/agent/src/harness/messages.ts:</span>
+<span class="k">declare module</span> <span class="s">"../types.ts"</span> {
+  <span class="k">interface</span> <span class="t">CustomAgentMessages</span> {
+    bashExecution: <span class="t">BashExecutionMessage</span>;     <span class="c">// a user-run `!cmd`</span>
+    custom: <span class="t">CustomMessage</span>;                   <span class="c">// extension-emitted</span>
+    branchSummary: <span class="t">BranchSummaryMessage</span>;     <span class="c">// from tree navigation</span>
+    compactionSummary: <span class="t">CompactionSummaryMessage</span>; <span class="c">// from compaction</span>
+  }
+}</code></pre>
+    </div>
+
+    <p>The bridge from the rich transcript to the model's three roles is one required callback, <code>convertToLlm</code>. It runs immediately before every model call and is where custom messages are either translated to a <code>user</code> message or filtered out entirely. A second, optional callback, <code>transformContext</code>, runs <em>before</em> that and operates at the <code>AgentMessage</code> level &mdash; this is the hook for pruning, compaction, and context injection. The full pipeline:</p>
+
+    <div class="ascii">
+<pre>context.messages: <span class="b">AgentMessage[]</span>
+        │
+        ▼  <span class="hl">transformContext(messages)</span>   <span class="mut">— optional: prune / inject / compact (AgentMessage → AgentMessage)</span>
+        ▼  <span class="hl">convertToLlm(messages)</span>       <span class="mut">— required: filter UI-only, translate custom (AgentMessage → Message)</span>
+        ▼  <span class="hl">streamSimple(model, ctx)</span>     <span class="mut">— Message → provider wire format</span>
+   <span class="g">AssistantMessage</span></pre>
+    </div>
+
+    <h3>The loop, annotated</h3>
+
+    <p>Here is the actual core, <code>runLoop</code>, lightly condensed. Notice it is two nested loops: an <em>inner</em> loop that runs turns while there are tool calls or pending steering messages, and an <em>outer</em> loop that restarts when follow-up messages arrive after the agent would otherwise stop.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/agent/src/agent-loop.ts — runLoop (condensed)</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">let</span> pendingMessages = (<span class="k">await</span> config.<span class="f">getSteeringMessages</span>?.()) || [];
+
+<span class="k">while</span> (<span class="n">true</span>) {                              <span class="c">// OUTER: re-enters for follow-ups</span>
+  <span class="k">let</span> hasMoreToolCalls = <span class="n">true</span>;
+  <span class="k">while</span> (hasMoreToolCalls || pendingMessages.length &gt; <span class="n">0</span>) { <span class="c">// INNER: one turn per iteration</span>
+    <span class="k">await</span> <span class="f">emit</span>({ type: <span class="s">"turn_start"</span> });
+
+    <span class="k">for</span> (<span class="k">const</span> message <span class="k">of</span> pendingMessages) {     <span class="c">// inject steering before the model speaks</span>
+      <span class="k">await</span> <span class="f">emit</span>({ type: <span class="s">"message_start"</span>, message });
+      <span class="k">await</span> <span class="f">emit</span>({ type: <span class="s">"message_end"</span>, message });
+      currentContext.messages.<span class="f">push</span>(message); newMessages.<span class="f">push</span>(message);
+    }
+    pendingMessages = [];
+
+    <span class="k">const</span> message = <span class="k">await</span> <span class="f">streamAssistantResponse</span>(currentContext, config, signal, emit, streamFn);
+    newMessages.<span class="f">push</span>(message);
+
+    <span class="k">if</span> (message.stopReason === <span class="s">"error"</span> || message.stopReason === <span class="s">"aborted"</span>) {
+      <span class="k">await</span> <span class="f">emit</span>({ type: <span class="s">"turn_end"</span>, message, toolResults: [] });
+      <span class="k">await</span> <span class="f">emit</span>({ type: <span class="s">"agent_end"</span>, messages: newMessages });
+      <span class="k">return</span>;                                <span class="c">// errors-as-values: no throw, just stop</span>
+    }
+
+    <span class="k">const</span> toolCalls = message.content.<span class="f">filter</span>(c =&gt; c.type === <span class="s">"toolCall"</span>);
+    <span class="k">const</span> toolResults = [];
+    hasMoreToolCalls = <span class="n">false</span>;
+    <span class="k">if</span> (toolCalls.length &gt; <span class="n">0</span>) {
+      <span class="k">const</span> batch = <span class="k">await</span> <span class="f">executeToolCalls</span>(currentContext, message, config, signal, emit);
+      toolResults.<span class="f">push</span>(...batch.messages);
+      hasMoreToolCalls = !batch.terminate;       <span class="c">// tools can request early stop</span>
+      <span class="k">for</span> (<span class="k">const</span> r <span class="k">of</span> toolResults) { currentContext.messages.<span class="f">push</span>(r); newMessages.<span class="f">push</span>(r); }
+    }
+    <span class="k">await</span> <span class="f">emit</span>({ type: <span class="s">"turn_end"</span>, message, toolResults });
+
+    <span class="k">const</span> snap = <span class="k">await</span> config.<span class="f">prepareNextTurn</span>?.({ message, toolResults, context: currentContext, newMessages });
+    <span class="k">if</span> (snap) { <span class="c">/* swap in fresh context / model / thinking for next turn */</span> }
+
+    <span class="k">if</span> (<span class="k">await</span> config.<span class="f">shouldStopAfterTurn</span>?.({ ... })) {     <span class="c">// graceful stop hook (e.g. compact)</span>
+      <span class="k">await</span> <span class="f">emit</span>({ type: <span class="s">"agent_end"</span>, messages: newMessages }); <span class="k">return</span>;
+    }
+    pendingMessages = (<span class="k">await</span> config.<span class="f">getSteeringMessages</span>?.()) || [];
+  }
+  <span class="k">const</span> followUps = (<span class="k">await</span> config.<span class="f">getFollowUpMessages</span>?.()) || [];
+  <span class="k">if</span> (followUps.length &gt; <span class="n">0</span>) { pendingMessages = followUps; <span class="k">continue</span>; } <span class="c">// outer loop re-enters</span>
+  <span class="k">break</span>;
+}
+<span class="k">await</span> <span class="f">emit</span>({ type: <span class="s">"agent_end"</span>, messages: newMessages });</code></pre>
+    </div>
+
+    <p>Five things to extract from this:</p>
+    <ul>
+      <li><strong>A "turn" is one model call plus its tool executions.</strong> The loop continues turning as long as the model keeps requesting tools. When a turn produces no tool calls and the queues are empty, the loop ends.</li>
+      <li><strong>Everything is an event.</strong> The loop never touches a UI or a file directly; it <code>emit</code>s a stream of typed events (<code>turn_start</code>, <code>message_start/update/end</code>, <code>tool_execution_start/update/end</code>, <code>turn_end</code>, <code>agent_end</code>). Whoever drives the loop reduces those events into state and renders them. This is the seam that lets the same loop power a TUI, an SDK, and an RPC server.</li>
+      <li><strong>Errors stop the loop, they don't crash it.</strong> A failed model call arrives as an <code>AssistantMessage</code> with <code>stopReason: "error"</code>; the loop emits the closing events and returns cleanly. No exception ever escapes.</li>
+      <li><strong>Steering and follow-up are queue-drain points.</strong> Steering messages are injected at the <em>top</em> of each inner iteration (interrupting between turns); follow-ups are checked only when the agent would otherwise stop (re-entering the outer loop). <code>getSteeringMessages</code>/<code>getFollowUpMessages</code> are callbacks, so the queue lives in the layer above.</li>
+      <li><strong><code>prepareNextTurn</code> is the hook the orchestrator uses to swap state mid-run.</strong> Between turns, the harness can hand back a fresh context, a different model, or a new thinking level &mdash; without ever mutating the request that is currently in flight. This is the mechanism behind "change the model mid-conversation and have it take effect next turn" (Chapter 5).</li>
+    </ul>
+
+    <h3>Tool execution: preflight, run, finalize</h3>
+
+    <p>Tool execution is more subtle than "call the function". Each call passes through three phases &mdash; <code>prepareToolCall</code> (find the tool, coerce + validate arguments against its TypeBox schema, run the <code>beforeToolCall</code> gate which may <em>block</em> it), <code>executePreparedToolCall</code> (run <code>tool.execute</code>, forwarding streamed <code>onUpdate</code> partials as events), and <code>finalizeExecutedToolCall</code> (run the <code>afterToolCall</code> hook, which can patch the result or set <code>terminate</code>). Critically, a <em>thrown</em> error inside a tool is caught and converted into a tool result with <code>isError: true</code> &mdash; the model sees the error text and can retry, rather than the whole loop dying.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">agent-loop.ts — error becomes a value the model can read</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">try</span> {
+  <span class="k">const</span> result = <span class="k">await</span> prepared.tool.<span class="f">execute</span>(id, args, signal, onUpdate);
+  <span class="k">return</span> { result, isError: <span class="n">false</span> };
+} <span class="k">catch</span> (error) {
+  <span class="k">return</span> { result: <span class="f">createErrorToolResult</span>(error instanceof <span class="t">Error</span> ? error.message : <span class="t">String</span>(error)),
+           isError: <span class="n">true</span> };       <span class="c">// fed back to the LLM as a tool error</span>
+}</code></pre>
+    </div>
+
+    <p>Batches of tool calls run in one of two modes. In <span class="kt">parallel</span> mode (the default), all calls are preflighted sequentially, then allowed tools execute concurrently via <code>Promise.all</code>; completion events fire as each tool finishes, but the persisted <code>toolResult</code> messages are re-ordered back into the assistant's original call order so the transcript stays deterministic. In <span class="kt">sequential</span> mode, calls run one at a time. A single tool can force the whole batch sequential by declaring <code>executionMode: "sequential"</code> &mdash; which the <code>edit</code> tool does, because two edits to overlapping regions in one batch must not race.</p>
+
+    <div class="callout note">
+      <div class="callout-label">terminate</div>
+      <p>A tool can return <code>terminate: true</code> to hint that the agent should stop after this batch instead of doing another model call. The loop only honors it when <em>every</em> finalized result in the batch is terminating &mdash; a mixed batch continues normally. This is how a tool like "submit final answer" cleanly ends a run without a wasted follow-up turn.</p>
+    </div>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 4 -->
+    <span class="section-marker" id="c4">04 &mdash; State &amp; Lifecycle</span>
+    <h2>The Stateful Agent</h2>
+
+    <p>The raw <code>agentLoop</code> is a function: you hand it messages and config, it streams events, it returns. It holds no state between calls and gives you no way to interrupt it from outside. The <code>Agent</code> class (<span class="fp">packages/agent/src/agent.ts</span>) wraps it into a stateful, controllable object: it owns the running transcript, exposes lifecycle events to subscribers, manages the steering and follow-up queues, and defines what "the run is finished" precisely means.</p>
+
+    <h3>State you can read, queues you can push to</h3>
+
+    <p><code>agent.state</code> exposes the live transcript and streaming status. Two of its fields use accessor properties that <em>copy the array on assignment</em> &mdash; a small but deliberate defense so that handing the agent a messages array doesn't let outside code mutate its internals by reference:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/agent/src/agent.ts — AgentState (shape)</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">interface</span> <span class="t">AgentState</span> {
+  systemPrompt: <span class="t">string</span>;
+  model: <span class="t">Model</span>&lt;<span class="k">any</span>&gt;;
+  thinkingLevel: <span class="t">ThinkingLevel</span>;
+  tools: <span class="t">AgentTool</span>[];                 <span class="c">// assigning copies the array</span>
+  messages: <span class="t">AgentMessage</span>[];            <span class="c">// assigning copies the array</span>
+  <span class="k">readonly</span> isStreaming: <span class="t">boolean</span>;        <span class="c">// true until awaited agent_end listeners settle</span>
+  <span class="k">readonly</span> streamingMessage?: <span class="t">AgentMessage</span>;  <span class="c">// the partial being streamed right now</span>
+  <span class="k">readonly</span> pendingToolCalls: <span class="t">ReadonlySet</span>&lt;<span class="t">string</span>&gt;;
+  <span class="k">readonly</span> errorMessage?: <span class="t">string</span>;
+}</code></pre>
+    </div>
+
+    <p>Two FIFO queues sit beside the transcript. <span class="kt">Steering</span> messages interrupt the agent <em>while it works</em> ("stop, do this instead") &mdash; they're injected between turns. <span class="kt">Follow-up</span> messages wait until the agent would otherwise stop, then start a new turn ("also, when you're done, summarize"). Each queue has a mode: <code>one-at-a-time</code> (drain the oldest only) or <code>all</code> (drain everything at the next drain point). The loop's <code>getSteeringMessages</code>/<code>getFollowUpMessages</code> callbacks (Chapter 3) are wired straight to these queues.</p>
+
+    <h3>The subtle part: when is a run actually "done"?</h3>
+
+    <p>Naively, the run ends when <code>agent_end</code> is emitted. But subscribers (the UI, the session-saver) may do <em>async</em> work in response to <code>agent_end</code> &mdash; flushing to disk, final renders. If <code>prompt()</code> resolved before those finished, you'd have races. So the <code>Agent</code> defines settlement carefully: listeners are awaited in subscription order, and the run is idle only after the <code>agent_end</code> listeners have all settled.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">agent.ts — every event is reduced into state, then awaited by listeners</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">private async</span> <span class="f">processEvents</span>(event: <span class="t">AgentEvent</span>): <span class="t">Promise</span>&lt;<span class="t">void</span>&gt; {
+  <span class="k">switch</span> (event.type) {
+    <span class="k">case</span> <span class="s">"message_update"</span>: <span class="k">this</span>._state.streamingMessage = event.message; <span class="k">break</span>;
+    <span class="k">case</span> <span class="s">"message_end"</span>:    <span class="k">this</span>._state.messages.<span class="f">push</span>(event.message); <span class="k">break</span>;
+    <span class="k">case</span> <span class="s">"tool_execution_start"</span>: <span class="c">/* add to pendingToolCalls */</span> <span class="k">break</span>;
+    <span class="k">case</span> <span class="s">"agent_end"</span>:      <span class="k">this</span>._state.streamingMessage = <span class="k">undefined</span>; <span class="k">break</span>;
+  }
+  <span class="k">const</span> signal = <span class="k">this</span>.activeRun?.abortController.signal;
+  <span class="k">for</span> (<span class="k">const</span> listener <span class="k">of</span> <span class="k">this</span>.listeners) {
+    <span class="k">await</span> <span class="f">listener</span>(event, signal!);   <span class="c">// awaited, in registration order — part of settlement</span>
+  }
+}</code></pre>
+    </div>
+
+    <p>The class is the lifecycle owner. <code>prompt(input, images?)</code> normalizes input into a user message and starts a run; it throws if one is already active (you must <code>steer</code> or <code>followUp</code> instead). <code>continue()</code> resumes from the current transcript without a new message &mdash; used for retries, with the rule that the last message must be a <code>user</code> or <code>toolResult</code>, never <code>assistant</code>. <code>abort()</code> signals the active run's <code>AbortController</code>. <code>waitForIdle()</code> returns the run promise. A failed run doesn't reject <code>prompt()</code> &mdash; it synthesizes a failure <code>AssistantMessage</code> and emits the normal closing event sequence, so the UI renders the error exactly like any other message.</p>
+
+    <div class="callout insight">
+      <div class="callout-label">Why two layers (loop vs. Agent)?</div>
+      <p>The raw loop is a pure, testable async generator of events with no hidden state &mdash; ideal for unit tests and for embedding. The <code>Agent</code> adds exactly the stateful concerns a real application needs: a persistent transcript, interruptibility, queueing, and deterministic settlement. Keeping them separate means the hard concurrency logic (settlement, abort) lives in one place and the loop stays trivial to reason about. The next layer, <code>AgentHarness</code>, adds a <em>third</em> ring: persistence and runtime reconfiguration.</p>
+    </div>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 5 -->
+    <span class="section-marker" id="c5">05 &mdash; Orchestration</span>
+    <h2>The Orchestrator: AgentHarness</h2>
+
+    <p>The <code>Agent</code> can run a conversation in memory. A real coding agent must also persist every message to disk as it happens, let you change the model or tools <em>mid-run</em> without corrupting the request in flight, expose typed hooks so extensions can intercept tool calls and provider payloads, and do structural operations like compaction and branching. That is the <code>AgentHarness</code> (<span class="fp">packages/agent/src/harness/agent-harness.ts</span>) &mdash; the orchestration layer, and the most carefully-engineered file in the repo. Its own design doc states the goal bluntly: hooks and listeners must be able to call back into the harness "without corrupting in-flight turn snapshots, reordering persisted transcript entries, losing pending writes, or deadlocking settlement."</p>
+
+    <h3>Phases: a state machine that rejects nonsense</h3>
+
+    <p>The harness has an explicit phase, and structural operations assert idleness <em>synchronously, before the first await</em>:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/agent/src/harness/types.ts &amp; agent-harness.ts</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">type</span> <span class="t">AgentHarnessPhase</span> = <span class="s">"idle"</span> | <span class="s">"turn"</span> | <span class="s">"compaction"</span> | <span class="s">"branch_summary"</span> | <span class="s">"retry"</span>;
+
+<span class="k">async</span> <span class="f">prompt</span>(text: <span class="t">string</span>, options?): <span class="t">Promise</span>&lt;<span class="t">AssistantMessage</span>&gt; {
+  <span class="k">if</span> (<span class="k">this</span>.phase !== <span class="s">"idle"</span>) <span class="k">throw new</span> <span class="t">AgentHarnessError</span>(<span class="s">"busy"</span>, <span class="s">"AgentHarness is busy"</span>);
+  <span class="k">this</span>.phase = <span class="s">"turn"</span>;                       <span class="c">// set before any await — no race window</span>
+  <span class="k">const</span> finishRunPromise = <span class="k">this</span>.<span class="f">startRunPromise</span>();
+  <span class="k">try</span> {
+    <span class="k">const</span> turnState = <span class="k">await</span> <span class="k">this</span>.<span class="f">createTurnState</span>();
+    <span class="k">return await</span> <span class="k">this</span>.<span class="f">executeTurn</span>(turnState, text, options);
+  } <span class="k">catch</span> (error) { <span class="k">this</span>.phase = <span class="s">"idle"</span>; <span class="k">throw</span> <span class="f">normalizeHarnessError</span>(error, <span class="s">"unknown"</span>); }
+  <span class="k">finally</span> { <span class="f">finishRunPromise</span>(); }
+}</code></pre>
+    </div>
+
+    <p>Structural operations (<code>prompt</code>, <code>skill</code>, <code>promptFromTemplate</code>, <code>compact</code>, <code>navigateTree</code>) require <code>idle</code> and flip the phase atomically. Operations that are <em>meant</em> to run during a turn (<code>steer</code>, <code>followUp</code>, <code>nextTurn</code>, <code>abort</code>, and all the runtime config setters) are allowed while busy. Trying to start a second structural operation while busy throws a typed <code>"busy"</code> error rather than corrupting state.</p>
+
+    <h3>Turn snapshots: config changes never mutate the request in flight</h3>
+
+    <p>This is the central idea. The harness separates <span class="kt">live config</span> (the latest model, tools, resources, stream options you've set) from a <span class="kt">turn snapshot</span> (the frozen state used for one specific model call). When a turn starts, <code>createTurnState()</code> takes a snapshot. Setters like <code>setModel()</code> update live config immediately &mdash; but the running turn keeps using its snapshot. The change takes effect at the next <span class="kt">save point</span>.</p>
+
+    <div class="fig">
+      <div class="fig-label">Figure 3 &mdash; Live config vs. turn snapshot</div>
+      <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" font-family="DM Sans, sans-serif">
+        <defs><marker id="ah2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#7a7870"/></marker></defs>
+        <rect x="30" y="20" width="200" height="62" rx="6" fill="#fdf0e8" stroke="#c4622d"/>
+        <text x="130" y="44" text-anchor="middle" font-size="12" fill="#c4622d" font-weight="600">Live harness config</text>
+        <text x="130" y="62" text-anchor="middle" font-size="9.5" fill="#7a7870">model, tools, thinking, resources</text>
+        <text x="130" y="74" text-anchor="middle" font-size="9.5" fill="#7a7870">setModel() updates this instantly</text>
+        <!-- snapshots -->
+        <rect x="300" y="15" width="170" height="50" rx="6" fill="#eef3fc" stroke="#2a5db0"/>
+        <text x="385" y="35" text-anchor="middle" font-size="11" fill="#2a5db0" font-weight="600">Turn snapshot #1</text>
+        <text x="385" y="51" text-anchor="middle" font-size="9.5" fill="#7a7870">frozen for model call 1</text>
+        <rect x="300" y="100" width="170" height="50" rx="6" fill="#eef3fc" stroke="#2a5db0"/>
+        <text x="385" y="120" text-anchor="middle" font-size="11" fill="#2a5db0" font-weight="600">Turn snapshot #2</text>
+        <text x="385" y="136" text-anchor="middle" font-size="9.5" fill="#7a7870">frozen for model call 2</text>
+        <!-- provider -->
+        <rect x="540" y="55" width="150" height="56" rx="6" fill="#eaf5ee" stroke="#1a7a4a"/>
+        <text x="615" y="80" text-anchor="middle" font-size="11" fill="#1a7a4a" font-weight="600">provider request</text>
+        <text x="615" y="96" text-anchor="middle" font-size="9.5" fill="#7a7870">uses the snapshot only</text>
+        <path d="M230 45 C 260 42, 270 40, 298 40" fill="none" stroke="#7a7870" stroke-width="1.4" marker-end="url(#ah2)"/>
+        <text x="250" y="28" font-size="9" fill="#7a7870">createTurnState()</text>
+        <path d="M230 60 C 260 110, 270 122, 298 125" fill="none" stroke="#7a7870" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#ah2)"/>
+        <text x="232" y="118" font-size="9" fill="#7a7870">save point</text>
+        <path d="M470 40 C 505 50, 510 60, 538 72" fill="none" stroke="#1a7a4a" stroke-width="1.4" marker-end="url(#ah2)"/>
+        <path d="M470 125 C 505 110, 510 100, 538 92" fill="none" stroke="#1a7a4a" stroke-width="1.4" marker-end="url(#ah2)"/>
+        <text x="130" y="120" font-size="9.5" fill="#7a7870" font-style="italic">setModel("opus") here…</text>
+        <text x="130" y="138" font-size="9.5" fill="#7a7870" font-style="italic">…takes effect at snapshot #2</text>
+      </svg>
+      <div class="fig-cap">A provider request only ever reads a snapshot. Changing the model mid-turn is safe: the in-flight request finishes on the old model, and the <em>next</em> turn's snapshot picks up the new one. This is what makes "switch model and keep going" not a data race.</div>
+    </div>
+
+    <p>The save point is where the magic happens. It is the harness's implementation of the loop's <code>prepareNextTurn</code> hook from Chapter 3:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">agent-harness.ts — the save point (prepareNextTurn)</span><span class="code-lang">typescript</span></div>
+<pre><code>prepareNextTurn: <span class="k">async</span> () =&gt; {
+  <span class="k">await</span> <span class="k">this</span>.<span class="f">flushPendingSessionWrites</span>();        <span class="c">// 1. durably persist anything queued during the turn</span>
+  <span class="k">const</span> nextTurnState = <span class="k">await</span> <span class="k">this</span>.<span class="f">createTurnState</span>(); <span class="c">// 2. take a FRESH snapshot (new model/tools/context)</span>
+  <span class="f">setTurnState</span>(nextTurnState);
+  <span class="k">return</span> { context: <span class="k">this</span>.<span class="f">createContext</span>(nextTurnState),
+           model: nextTurnState.model, thinkingLevel: nextTurnState.thinkingLevel };
+},</code></pre>
+    </div>
+
+    <h3>Pending writes: durable ordering under concurrency</h3>
+
+    <p>Persistence is append-only and order-sensitive (Chapter 6). But config changes and extension writes can happen <em>while a turn is running</em>. If the harness wrote them immediately, they'd interleave incorrectly with the agent's own message writes. The solution: when busy, writes are <em>queued</em> as <code>PendingSessionWrite</code>s and flushed in deterministic order at save points, at settlement, and in failure cleanup. When idle, they persist immediately. Every setter follows the same pattern:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">agent-harness.ts — setModel: persist now if idle, queue if busy</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">async</span> <span class="f">setModel</span>(model: <span class="t">Model</span>&lt;<span class="k">any</span>&gt;): <span class="t">Promise</span>&lt;<span class="t">void</span>&gt; {
+  <span class="k">if</span> (<span class="k">this</span>.phase === <span class="s">"idle"</span>) {
+    <span class="k">await</span> <span class="k">this</span>.session.<span class="f">appendModelChange</span>(model.provider, model.id);  <span class="c">// write now</span>
+  } <span class="k">else</span> {
+    <span class="k">this</span>.pendingSessionWrites.<span class="f">push</span>({ type: <span class="s">"model_change"</span>, provider: model.provider, modelId: model.id }); <span class="c">// queue</span>
+  }
+  <span class="k">this</span>.model = model;                          <span class="c">// live config updates either way</span>
+  <span class="k">await</span> <span class="k">this</span>.<span class="f">emitOwn</span>({ type: <span class="s">"model_update"</span>, model, previousModel, source: <span class="s">"set"</span> });
+}</code></pre>
+    </div>
+
+    <h3>Hooks: the harness's control plane</h3>
+
+    <p>The harness wraps the loop's plain callbacks with a typed hook system. The loop's <code>transformContext</code> becomes a <code>context</code> hook; <code>beforeToolCall</code> becomes a <code>tool_call</code> hook that can block; <code>afterToolCall</code> becomes a <code>tool_result</code> hook that can patch. It also adds provider-level hooks (<code>before_provider_request</code> to patch stream options, <code>before_provider_payload</code> to rewrite the raw request body, <code>after_provider_response</code> to read status/headers) and its own lifecycle events (<code>save_point</code>, <code>settled</code>, <code>queue_update</code>). The design (documented in <code>hooks.md</code>) is elegant: events carry their own result type as a phantom, so the type system knows which events may return a value:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/agent/docs/hooks.md — events carry their result type</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">interface</span> <span class="t">HookEvent</span>&lt;<span class="t">TType</span> <span class="k">extends</span> <span class="t">string</span>, <span class="t">TResult</span> = <span class="t">void</span>&gt; {
+  type: <span class="t">TType</span>;
+  <span class="k">readonly</span> [HookResult]?: <span class="t">TResult</span>;   <span class="c">// phantom — encodes the result type at the type level</span>
+}
+<span class="c">// tool_call may return {block, reason}; message_end returns nothing — enforced by types</span>
+<span class="k">interface</span> <span class="t">ToolCallEvent</span>  <span class="k">extends</span> <span class="t">HookEvent</span>&lt;<span class="s">"tool_call"</span>, { block?: <span class="t">boolean</span>; reason?: <span class="t">string</span> }&gt; { ... }
+<span class="k">interface</span> <span class="t">MessageEndEvent</span> <span class="k">extends</span> <span class="t">HookEvent</span>&lt;<span class="s">"message_end"</span>&gt; { message: <span class="t">AgentMessage</span>; }</code></pre>
+    </div>
+
+    <p>Different hooks have different reduction semantics, and getting these right is most of the work: <code>context</code> and <code>before_provider_payload</code> are <em>sequential transforms</em> (each handler sees the previous one's output); <code>tool_call</code> is <em>early-exit on block</em>; <code>tool_result</code> is <em>patch accumulation</em>; <code>session_before_compact</code> is <em>early-exit on cancel</em>. The coding agent's extension system (Chapter 10) is built almost entirely on these hooks.</p>
+
+    <div class="callout note">
+      <div class="callout-label">Toward durability</div>
+      <p>Pi's <code>durable-harness.md</code> sketches the endgame: because the session is already an append-only log of every state change (model, thinking, active tools, compactions, leaf moves), a crashed harness could be <em>reconstructed</em> by replaying the log. The plan adds durable entries for queues, pending writes, and operation boundaries, with a conservative recovery policy: unfinished turns are marked interrupted; unfinished tool calls are <em>not</em> retried unless the tool declares itself idempotent (external side effects may already have happened). It is a clear-eyed acknowledgment that provider streams aren't resumable, so recovery must restart from durable boundaries.</p>
+    </div>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 6 -->
+    <span class="section-marker" id="c6">06 &mdash; Memory on Disk</span>
+    <h2>Sessions &amp; Persistence: An Append-Only Conversation Tree</h2>
+
+    <p>An LLM has no memory. The harness must provide it &mdash; not just within a run, but across days, across crashes, and across <em>branches</em> of exploration. Pi's answer is a single, elegant data structure: the session is an <strong>append-only log of typed entries that forms a tree</strong>. Everything &mdash; messages, model changes, compactions, the current position &mdash; is an entry. Nothing is ever mutated or deleted. To "go back" you just point at an older node.</p>
+
+    <h3>Everything is an entry</h3>
+
+    <p>A session on disk is a JSONL file: one JSON object per line, appended as events happen. Each line is a <code>SessionTreeEntry</code> &mdash; a discriminated union. The base shape gives every entry an id, a parent pointer (the tree edge), and a timestamp:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/agent/src/harness/types.ts — the entry union</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">interface</span> <span class="t">SessionTreeEntryBase</span> {
+  type: <span class="t">string</span>;
+  id: <span class="t">string</span>;
+  parentId: <span class="t">string</span> | <span class="n">null</span>;   <span class="c">// the tree edge — null means root</span>
+  timestamp: <span class="t">string</span>;
+}
+
+<span class="k">type</span> <span class="t">SessionTreeEntry</span> =
+  | <span class="t">MessageEntry</span>             <span class="c">// { message: AgentMessage }       — user/assistant/toolResult/custom</span>
+  | <span class="t">ModelChangeEntry</span>         <span class="c">// { provider, modelId }           — model switched here</span>
+  | <span class="t">ThinkingLevelChangeEntry</span> <span class="c">// { thinkingLevel }</span>
+  | <span class="t">ActiveToolsChangeEntry</span>   <span class="c">// { activeToolNames }             — tool set changed here</span>
+  | <span class="t">CompactionEntry</span>         <span class="c">// { summary, firstKeptEntryId, tokensBefore } — see ch.7</span>
+  | <span class="t">BranchSummaryEntry</span>       <span class="c">// { fromId, summary }             — a branch we came back from</span>
+  | <span class="t">CustomEntry</span>             <span class="c">// { customType, data }            — extension state, not sent to LLM</span>
+  | <span class="t">CustomMessageEntry</span>       <span class="c">// { customType, content, display } — extension message</span>
+  | <span class="t">LabelEntry</span>              <span class="c">// { targetId, label }             — a bookmark on a node</span>
+  | <span class="t">SessionInfoEntry</span>        <span class="c">// { name }                        — session display name</span>
+  | <span class="t">LeafEntry</span>;             <span class="c">// { targetId }                    — moves the "current position" pointer</span></code></pre>
+    </div>
+
+    <p>This is the durability design from Chapter 5 made concrete. Notice that <em>configuration changes are entries too</em>. When you switch from Sonnet to Opus, that is a <code>model_change</code> entry on the current branch. This is what makes "resume the session exactly as it was" possible &mdash; and it is the foundation for the durable-recovery plan, because replaying the log reconstructs not just the conversation but the entire harness configuration at any point.</p>
+
+    <h3>The tree, and the leaf pointer</h3>
+
+    <p>Because each entry has a <code>parentId</code>, the entries form a tree, not a list. Most of the time it's a straight chain (each entry's parent is the previous one). But when you <em>edit an earlier message</em> or <em>navigate back</em>, new entries get appended with an older <code>parentId</code> &mdash; creating a branch. The "current position" is tracked by a special, durable <code>leaf</code> entry. Critically, the leaf pointer is itself an append-only entry, not an in-memory cursor:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">agent-harness.ts design note &amp; session.ts</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="c">// from the harness lifecycle doc:</span>
+<span class="c">// "setLeafId() is not an in-memory-only cursor update; it appends a durable</span>
+<span class="c">//  entry whose targetId is the active tree leaf. Reopening storage must</span>
+<span class="c">//  reconstruct the current leaf from the latest persisted leaf-affecting entry."</span>
+
+<span class="k">async</span> <span class="f">moveTo</span>(entryId: <span class="t">string</span> | <span class="n">null</span>, summary?): <span class="t">Promise</span>&lt;<span class="t">string</span> | <span class="k">undefined</span>&gt; {
+  <span class="k">await</span> <span class="k">this</span>.storage.<span class="f">setLeafId</span>(entryId);     <span class="c">// append a leaf entry → new current position</span>
+  <span class="k">if</span> (!summary) <span class="k">return</span> <span class="k">undefined</span>;
+  <span class="k">return</span> <span class="k">this</span>.<span class="f">appendTypedEntry</span>({ type: <span class="s">"branch_summary"</span>, ... }); <span class="c">// optionally record where we came from</span>
+}</code></pre>
+    </div>
+
+    <div class="fig">
+      <div class="fig-label">Figure 4 &mdash; The session as a tree</div>
+      <svg viewBox="0 0 700 270" xmlns="http://www.w3.org/2000/svg" font-family="DM Mono, monospace">
+        <defs><marker id="ah4" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#b8b2a6"/></marker></defs>
+        <!-- nodes -->
+        <g font-size="10.5">
+        <circle cx="70" cy="60" r="16" fill="#eef3fc" stroke="#2a5db0"/><text x="70" y="64" text-anchor="middle" fill="#2a5db0">u1</text>
+        <circle cx="160" cy="60" r="16" fill="#fdf0e8" stroke="#c4622d"/><text x="160" y="64" text-anchor="middle" fill="#c4622d">a1</text>
+        <circle cx="250" cy="60" r="16" fill="#eef3fc" stroke="#2a5db0"/><text x="250" y="64" text-anchor="middle" fill="#2a5db0">u2</text>
+        <circle cx="340" cy="60" r="16" fill="#fdf0e8" stroke="#c4622d"/><text x="340" y="64" text-anchor="middle" fill="#c4622d">a2</text>
+        <!-- branch off u2 -->
+        <circle cx="340" cy="160" r="16" fill="#eef3fc" stroke="#2a5db0"/><text x="340" y="164" text-anchor="middle" fill="#2a5db0">u2'</text>
+        <circle cx="440" cy="160" r="16" fill="#fdf0e8" stroke="#c4622d"/><text x="440" y="164" text-anchor="middle" fill="#c4622d">a3</text>
+        <circle cx="540" cy="160" r="18" fill="#eaf5ee" stroke="#1a7a4a" stroke-width="2"/><text x="540" y="164" text-anchor="middle" fill="#1a7a4a">leaf</text>
+        </g>
+        <!-- edges -->
+        <g stroke="#b8b2a6" stroke-width="1.4" fill="none">
+        <path d="M86 60 L142 60" marker-end="url(#ah4)"/>
+        <path d="M176 60 L232 60" marker-end="url(#ah4)"/>
+        <path d="M266 60 L322 60" marker-end="url(#ah4)"/>
+        <path d="M258 74 C 290 110, 320 130, 332 146" marker-end="url(#ah4)"/>
+        <path d="M356 160 L422 160" marker-end="url(#ah4)"/>
+        <path d="M456 160 L520 160" marker-end="url(#ah4)"/>
+        </g>
+        <text x="250" y="40" text-anchor="middle" font-family="DM Sans" font-size="10" fill="#7a7870">original branch (abandoned after a2)</text>
+        <text x="300" y="120" font-family="DM Sans" font-size="10" fill="#7a7870" font-style="italic">edited u2 → new branch</text>
+        <text x="540" y="200" text-anchor="middle" font-family="DM Sans" font-size="10" fill="#1a7a4a">current leaf — context = path to root</text>
+      </svg>
+      <div class="fig-cap">Editing message <code>u2</code> doesn't delete <code>a2</code>; it appends <code>u2'</code> with the same parent as <code>u2</code>, then moves the leaf. The old branch survives on disk forever. The <em>active conversation</em> is always just the path from the current leaf back to the root.</div>
+    </div>
+
+    <h3>From tree to context: buildContext()</h3>
+
+    <p>So how does a tree become the flat <code>AgentMessage[]</code> the loop needs? You walk from the current leaf back to the root (<code>getPathToRoot</code>), then fold that path into context. This is <code>buildSessionContext</code>, and it does three jobs in one pass: replay config (the <em>last</em> model/thinking/tools entry on the path wins), then emit messages &mdash; with special handling for compaction.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/agent/src/harness/session/session.ts — buildSessionContext (condensed)</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">export function</span> <span class="f">buildSessionContext</span>(pathEntries: <span class="t">SessionTreeEntry</span>[]): <span class="t">SessionContext</span> {
+  <span class="k">let</span> model = <span class="n">null</span>, thinkingLevel = <span class="s">"off"</span>, activeToolNames = <span class="n">null</span>, compaction = <span class="n">null</span>;
+  <span class="k">for</span> (<span class="k">const</span> entry <span class="k">of</span> pathEntries) {           <span class="c">// last-write-wins for config</span>
+    <span class="k">if</span> (entry.type === <span class="s">"model_change"</span>) model = { provider: entry.provider, modelId: entry.modelId };
+    <span class="k">else if</span> (entry.type === <span class="s">"message"</span> &amp;&amp; entry.message.role === <span class="s">"assistant"</span>)
+      model = { provider: entry.message.provider, modelId: entry.message.model }; <span class="c">// infer from history</span>
+    <span class="k">else if</span> (entry.type === <span class="s">"compaction"</span>) compaction = entry;
+  }
+  <span class="k">const</span> messages = [];
+  <span class="k">if</span> (compaction) {
+    messages.<span class="f">push</span>(<span class="f">createCompactionSummaryMessage</span>(compaction.summary, ...)); <span class="c">// summary replaces old history</span>
+    <span class="c">// then only entries from firstKeptEntryId onward are appended…</span>
+  } <span class="k">else</span> {
+    <span class="k">for</span> (<span class="k">const</span> entry <span class="k">of</span> pathEntries) <span class="f">appendMessage</span>(entry); <span class="c">// custom/branchSummary become user messages</span>
+  }
+  <span class="k">return</span> { messages, thinkingLevel, model, activeToolNames };
+}</code></pre>
+    </div>
+
+    <p>This single function is why resume "just works": open the file, read the leaf, walk to root, fold. The model that was active, the tools that were enabled, the compaction that happened &mdash; all reconstructed from the log. The harness's <code>buildContext()</code> calls exactly this before every turn (Chapter 5's <code>createTurnState</code>).</p>
+
+    <div class="callout note">
+      <div class="callout-label">Storage is an interface</div>
+      <p><code>SessionStorage</code> is abstract: <code>appendEntry</code>, <code>getEntry</code>, <code>getPathToRoot</code>, <code>getLeafId</code>/<code>setLeafId</code>, <code>createEntryId</code>. The coding agent ships a JSONL-file implementation (one file per session under <code>~/.pi</code>) and an in-memory one for tests. Because the whole tree API is behind this interface, you could back sessions with SQLite or a remote store without touching a line of the agent loop. Forking a session, listing sessions, and deleting are a separate <code>SessionRepo</code> interface.</p>
+    </div>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 7 -->
+    <span class="section-marker" id="c7">07 &mdash; Surviving the Window</span>
+    <h2>Context Management &amp; Compaction</h2>
+
+    <p>Every model has a finite context window. A long coding session &mdash; reading files, running tests, accumulating tool output &mdash; will eventually fill it. When that happens you have three options: truncate (lose information), summarize (lossy but smart), or stop. Pi summarizes. <span class="kt">Compaction</span> replaces a long prefix of the conversation with a structured summary, keeping recent turns intact. This is the single most important technique for long-horizon agentic work, and Pi's implementation (<span class="fp">packages/agent/src/harness/compaction/</span>) is worth studying in detail.</p>
+
+    <h3>Estimating how full the window is</h3>
+
+    <p>You can't compact if you don't know you're close to the limit. Pi estimates context tokens cheaply, preferring real numbers when available: it finds the most recent assistant message with provider-reported <code>usage</code>, takes that as ground truth, and adds a character-based estimate for everything after it.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/agent/src/harness/compaction/compaction.ts</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="c">// ground truth from the provider + cheap estimate for the tail</span>
+<span class="k">export function</span> <span class="f">estimateContextTokens</span>(messages: <span class="t">AgentMessage</span>[]): <span class="t">ContextUsageEstimate</span> {
+  <span class="k">const</span> usageInfo = <span class="f">getLastAssistantUsageInfo</span>(messages);   <span class="c">// real tokens, last assistant turn</span>
+  <span class="k">if</span> (!usageInfo) { <span class="c">/* fall back to pure char/4 estimate of everything */</span> }
+  <span class="k">const</span> usageTokens = <span class="f">calculateContextTokens</span>(usageInfo.usage);
+  <span class="k">let</span> trailingTokens = <span class="n">0</span>;
+  <span class="k">for</span> (<span class="k">let</span> i = usageInfo.index + <span class="n">1</span>; i &lt; messages.length; i++)
+    trailingTokens += <span class="f">estimateTokens</span>(messages[i]);          <span class="c">// ~chars/4, images ≈ 4800 chars</span>
+  <span class="k">return</span> { tokens: usageTokens + trailingTokens, ... };
+}
+
+<span class="k">export function</span> <span class="f">shouldCompact</span>(contextTokens, contextWindow, settings): <span class="t">boolean</span> {
+  <span class="k">return</span> settings.enabled &amp;&amp; contextTokens &gt; contextWindow - settings.reserveTokens;
+}
+<span class="c">// DEFAULT_COMPACTION_SETTINGS = { reserveTokens: 16384, keepRecentTokens: 20000 }</span></code></pre>
+    </div>
+
+    <p>The threshold is <code>contextWindow &minus; reserveTokens</code> &mdash; it triggers <em>before</em> the window is full, leaving 16K tokens of headroom for the summarization call itself plus the next response. This connects back to the loop's <code>shouldStopAfterTurn</code> hook (Chapter 3): the harness checks fullness after each turn and can gracefully stop to compact before the next model call would overflow.</p>
+
+    <h3>Choosing the cut point</h3>
+
+    <p>You can't cut the conversation just anywhere. You must cut on a <em>turn boundary</em> &mdash; never between an assistant's tool call and its result, or the replayed transcript becomes invalid (an orphaned tool call). <code>findCutPoint</code> walks backward accumulating tokens until it has gathered ~<code>keepRecentTokens</code> (20K) worth of recent history, then snaps to the nearest valid cut point (a user message or other turn start), being careful never to split a tool-call/tool-result pair:</p>
+
+    <div class="ascii">
+<pre><span class="mut">┌──────────────────── full conversation (path to leaf) ────────────────────┐</span>
+ u1  a1  [tools]  u2  a2  [tools]  u3  a3 ......... u17  a17  [tools]  u18  a18
+ <span class="mut">└──────────── summarize this ───────────┘</span>     <span class="g">└──── keep recent (~20K tok) ────┘</span>
+                                          <span class="hl">▲ cut point: a user-message turn boundary</span>
+
+ after compaction →  [<span class="p">compaction summary</span>]  u15  a15 ......... u18  a18</pre>
+    </div>
+
+    <h3>The summarization prompt</h3>
+
+    <p>The summary is generated by a dedicated model call with a fixed system prompt and a structured output format. This format is the actual "memory" the agent carries forward, so its design matters enormously &mdash; it's optimized for an LLM to <em>resume work</em>, not for a human to read. Here is the real prompt, verbatim:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">compaction.ts — SUMMARIZATION_PROMPT (verbatim, abridged headers)</span><span class="code-lang">text</span></div>
+<pre><code>Create a structured context checkpoint summary that another LLM will use
+to continue the work. Use this EXACT format:
+
+## Goal
+[What is the user trying to accomplish?]
+
+## Constraints &amp; Preferences
+- [Any constraints, preferences, or requirements mentioned by user]
+
+## Progress
+### Done
+- [x] [Completed tasks/changes]
+### In Progress
+- [ ] [Current work]
+### Blocked
+- [Issues preventing progress, if any]
+
+## Key Decisions
+- **[Decision]**: [Brief rationale]
+
+## Next Steps
+1. [Ordered list of what should happen next]
+
+## Critical Context
+- [Any data, examples, or references needed to continue]
+
+Keep each section concise. Preserve exact file paths, function names,
+and error messages.</code></pre>
+    </div>
+
+    <p>Two details reveal real-world experience. First, there is a <em>separate</em> <code>UPDATE_SUMMARIZATION_PROMPT</code> for when a previous summary already exists: it instructs the model to preserve all prior information and only fold in what's new (moving items from "In Progress" to "Done"). Compaction is incremental &mdash; you summarize a summary plus new turns, not the whole history again. Second, the result is stored as a <code>CompactionEntry</code> carrying <code>firstKeptEntryId</code> and a <code>details</code> payload listing the files read and modified in the compacted span &mdash; so file-operation context survives the summary even though the raw tool calls don't.</p>
+
+    <h3>Branch summaries: the cousin of compaction</h3>
+
+    <p>Compaction summarizes <em>down a branch you're keeping</em>. Branch summarization handles the other case: you <em>leave</em> a branch (navigate back to an earlier node) and want to carry forward what you learned on the abandoned path. When <code>navigateTree</code> moves the leaf, it can generate a <code>branch_summary</code> entry recording what happened on the branch you're leaving, which then appears as a synthetic <code>user</code> message ("The following is a summary of a branch this conversation came back from…"). Same machinery, opposite direction:</p>
+
+    <div class="dtable-wrap">
+      <table class="dtable">
+        <thead><tr><th></th><th>Compaction</th><th>Branch summary</th></tr></thead>
+        <tbody>
+          <tr><td>Trigger</td><td>context window nearly full</td><td>navigating away from a branch</td></tr>
+          <tr><td>Summarizes</td><td>old prefix of the <em>current</em> branch</td><td>the branch you're <em>leaving</em></td></tr>
+          <tr><td>Stored as</td><td><code>compaction</code> entry (with <code>firstKeptEntryId</code>)</td><td><code>branch_summary</code> entry</td></tr>
+          <tr><td>In context as</td><td>a <code>compactionSummary</code> message replacing history</td><td>a <code>branchSummary</code> user message</td></tr>
+          <tr><td>Harness phase</td><td><code>"compaction"</code></td><td><code>"branch_summary"</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout insight">
+      <div class="callout-label">The pattern</div>
+      <p>Both are the same idea: <strong>lossy compression of conversation history into a structured artifact, triggered at a safe boundary, recorded as a durable session entry, and re-inflated into a synthetic message at context-build time.</strong> Because they're entries on the tree, they're permanent and resumable &mdash; reopen the session next week and the summary is right there in the reconstructed context. Both are also interceptable via hooks (<code>session_before_compact</code>, <code>session_before_tree</code>), so an extension can supply its own summary or cancel the operation entirely.</p>
+    </div>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 8 -->
+    <span class="section-marker" id="c8">08 &mdash; Acting on the World</span>
+    <h2>The Tools</h2>
+
+    <p>Tools are how the model touches reality. Everything else in this piece is plumbing to get a tool call from the model and a result back; the tools themselves are where the agent reads your files and runs your commands. Pi (<span class="fp">packages/coding-agent/src/core/tools/</span>) ships exactly <strong>seven</strong> built-ins &mdash; <code>read</code>, <code>bash</code>, <code>edit</code>, <code>write</code>, <code>grep</code>, <code>find</code>, <code>ls</code> &mdash; and the default coding profile enables just four of them (<code>read</code>, <code>bash</code>, <code>edit</code>, <code>write</code>), letting <code>bash</code> subsume search and listing. The design lessons are concentrated in three of them: <code>bash</code>, <code>edit</code>, and the truncation strategy they share.</p>
+
+    <h3>Two-tier tool definitions</h3>
+
+    <p>Each built-in is authored as a rich <code>ToolDefinition</code> &mdash; carrying not just the schema and executor but UI renderers, a one-line <code>promptSnippet</code> for the system prompt, and <code>promptGuidelines</code> &mdash; then wrapped into the minimal <code>AgentTool</code> the loop consumes. The model only ever sees <code>{name, description, parameters}</code>; the runtime adds <code>execute</code>. Every tool's filesystem and process access is injected via a pluggable <code>Operations</code> object, so the whole toolset can be redirected to SSH or a container without touching tool logic.</p>
+
+    <h3>bash: a fresh process every time</h3>
+
+    <p>The most important fact about the <code>bash</code> tool is what it is <em>not</em>: it is not a persistent shell. Every call spawns a brand-new child process. There is no shared environment, no working-directory persistence between calls &mdash; if the model wants to <code>cd</code> and then run something, it must chain <code>cd foo &amp;&amp; cmd</code> in one call. This is a deliberate simplicity-and-safety trade: no leaked state, no zombie shell, no ambiguity about what environment a command runs in.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">tools/bash.ts — the description the model sees, and the spawn</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="c">// Description (verbatim): "Execute a bash command in the current working directory.</span>
+<span class="c">// Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB</span>
+<span class="c">// (whichever is hit first). If truncated, full output is saved to a temp file."</span>
+
+<span class="k">const</span> child = <span class="f">spawn</span>(shellConfig.shell, [...shellConfig.args, command], {
+  cwd,
+  detached: process.platform !== <span class="s">"win32"</span>,   <span class="c">// own process group → killable as a tree</span>
+  env: env ?? <span class="f">getShellEnv</span>(),
+  stdio: [<span class="s">"ignore"</span>, <span class="s">"pipe"</span>, <span class="s">"pipe"</span>],
+  windowsHide: <span class="n">true</span>,
+});</code></pre>
+    </div>
+
+    <p>Spawning <code>detached</code> puts the child in its own process group. That is the key to clean cancellation: on abort or timeout, Pi calls <code>killProcessTree(child.pid)</code> &mdash; killing the whole group, so a command that spawned its own children (a test runner, a dev server) doesn't leave orphans behind. There is no default timeout; the model opts in per call.</p>
+
+    <h3>Bounded memory, complete output: the truncation strategy</h3>
+
+    <p>Tool output can be enormous &mdash; a build log, a giant file, a <code>find /</code>. Loading all of it into context is both expensive and useless. Pi's strategy, shared across tools via <code>OutputAccumulator</code> and the <code>truncate</code> primitives, is: <strong>bound what goes into context, but never lose data &mdash; spill the full stream to a temp file and tell the model where it is.</strong> Two limits apply, whichever hits first: <code>2000</code> lines or <code>50 KB</code>.</p>
+
+    <div class="ascii">
+<pre>command stdout/stderr (combined stream)
+        │
+        ▼ <span class="hl">OutputAccumulator</span>: keep a rolling tail in memory + running counters
+        │
+   exceeds 2000 lines or 50KB?
+        ├─ <span class="g">no</span>  → return full output
+        └─ <span class="hl">yes</span> → open <span class="b">/tmp/pi-bash-&lt;hex&gt;.log</span>, stream the FULL output there
+                 return the truncated TAIL + footer:
+                 <span class="mut">[Showing lines 4001-5000 of 5000. Full output: /tmp/pi-bash-….log]</span></pre>
+    </div>
+
+    <p>The direction of truncation differs by tool, and it's a thoughtful detail: <code>read</code> truncates the <em>head</em> (you want the start of a file, with a <code>Use offset=2001 to continue</code> hint), while <code>bash</code> truncates the <em>tail</em> (errors and final results land at the end of a log). Every truncation footer is <em>actionable</em> &mdash; it tells the model exactly how to get more: a continuation offset, a doubled limit, or the path to the spilled file it can then <code>read</code> or <code>grep</code>. The model is never left guessing whether output was cut.</p>
+
+    <h3>edit: exact, unique, non-overlapping, multi-edit</h3>
+
+    <p>The <code>edit</code> tool is a surgical string-replace, and its contract is strict &mdash; enforced, not just documented. The model supplies an array of <code>{oldText, newText}</code> pairs; each <code>oldText</code> must occur <em>exactly once</em> in the file, all matches are computed against the <em>original</em> file (not incrementally), and edits must not overlap. The verbatim guidance pushes the model toward correctness:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">tools/edit.ts — the schema &amp; guidelines (verbatim)</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="c">// oldText: "Exact text for one targeted replacement. It must be unique in the</span>
+<span class="c">//           original file and must not overlap with any other edits[].oldText."</span>
+<span class="k">const</span> editSchema = <span class="t">Type</span>.<span class="f">Object</span>({
+  path: <span class="t">Type</span>.<span class="f">String</span>(...),
+  edits: <span class="t">Type</span>.<span class="f">Array</span>(<span class="t">Type</span>.<span class="f">Object</span>({ oldText: <span class="t">Type</span>.<span class="f">String</span>(...), newText: <span class="t">Type</span>.<span class="f">String</span>(...) })),
+}, { additionalProperties: <span class="n">false</span> });
+
+<span class="c">// promptGuidelines (verbatim):</span>
+<span class="c">// - "Use edit for precise changes (edits[].oldText must match exactly)"</span>
+<span class="c">// - "When changing multiple separate locations in one file, use one edit call</span>
+<span class="c">//    with multiple entries in edits[] instead of multiple edit calls"</span>
+<span class="c">// - "Keep edits[].oldText as small as possible while still being unique."</span></code></pre>
+    </div>
+
+    <p>The execution is a masterclass in defensive engineering. It strips and restores BOM, detects and preserves the file's line ending (CRLF vs LF), but <em>normalizes everything to LF for matching</em> so the model never has to reason about encoding. If an exact match fails, it retries with a <span class="kt">fuzzy normalization</span> pass &mdash; NFKC Unicode normalization, smart quotes → straight quotes, Unicode dashes → hyphen, exotic spaces → regular space &mdash; because models frequently emit curly quotes and non-breaking spaces that don't byte-match the source. When fuzzy matching is needed, only the touched lines are rewritten; every untouched line keeps its original bytes. Failures produce precise, actionable error strings (<em>"Found N occurrences… The text must be unique. Please provide more context"</em>) that the model can act on. The tool returns both a display diff and a unified patch, and it declares <code>executionMode: "sequential"</code> so a batch of edits can't race.</p>
+
+    <h3>The file mutation queue: no lost updates</h3>
+
+    <p>Both <code>edit</code> and <code>write</code> mutate files, and tool calls can run in parallel. Two operations on the same file could read-modify-write over each other. The fix is a per-file serialization queue, keyed by the <em>canonical realpath</em> so two symlinks to the same inode share a queue, while different files proceed concurrently:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">tools/file-mutation-queue.ts (condensed)</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">const</span> fileMutationQueues = <span class="k">new</span> <span class="t">Map</span>&lt;<span class="t">string</span>, <span class="t">Promise</span>&lt;<span class="t">void</span>&gt;&gt;();
+
+<span class="k">export async function</span> <span class="f">withFileMutationQueue</span>&lt;<span class="t">T</span>&gt;(filePath: <span class="t">string</span>, fn: () =&gt; <span class="t">Promise</span>&lt;<span class="t">T</span>&gt;): <span class="t">Promise</span>&lt;<span class="t">T</span>&gt; {
+  <span class="k">const</span> key = <span class="k">await</span> <span class="f">getMutationQueueKey</span>(filePath);  <span class="c">// realpath() canonicalizes symlinks</span>
+  <span class="k">const</span> currentQueue = fileMutationQueues.<span class="f">get</span>(key) ?? <span class="t">Promise</span>.<span class="f">resolve</span>();
+  <span class="c">// chain a fresh promise onto this file's queue; release the next waiter in finally</span>
+  <span class="k">await</span> currentQueue;
+  <span class="k">try</span> { <span class="k">return await</span> <span class="f">fn</span>(); } <span class="k">finally</span> { <span class="c">/* releaseNext(); cleanup tail */</span> }
+}</code></pre>
+    </div>
+
+    <p>This same <code>withFileMutationQueue</code> is exported from the SDK so that <em>custom</em> file-mutating tools (from extensions) interleave safely with the built-in <code>edit</code>/<code>write</code>. It's a small primitive with an outsized correctness payoff &mdash; and notably, the queue key is realpath-canonicalized so the protection survives symlinks and even cooperating parallel <code>pi</code> sessions in the same repo.</p>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 9 -->
+    <span class="section-marker" id="c9">09 &mdash; Telling the Model Who It Is</span>
+    <h2>System Prompt, Skills &amp; Context Files</h2>
+
+    <p>The model's behavior is steered almost entirely by the system prompt and the context you inject. A coding agent's prompt is not a static string &mdash; it is assembled per turn from the active tools, the project's instruction files, available skills, and the current environment. The governing principle throughout is <span class="kt">progressive disclosure</span>: keep the always-on prompt small, and load detail on demand.</p>
+
+    <h3>Assembling the system prompt</h3>
+
+    <p><code>buildSystemPrompt</code> (<span class="fp">packages/coding-agent/src/core/system-prompt.ts</span>) composes the prompt from sections. The base identity establishes the agent, then the <em>active</em> tools are listed using their one-line snippets (not their full descriptions &mdash; those go to the model via the tools API separately), then deduped guidelines, then trailing context. The opening is verbatim:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">system-prompt.ts — the default identity block (verbatim)</span><span class="code-lang">text</span></div>
+<pre><code>You are an expert coding assistant operating inside pi, a coding agent
+harness. You help users by reading files, executing commands, editing
+code, and writing new files.
+
+Available tools:
+- read: Read file contents
+- bash: Execute bash commands (ls, grep, find, etc.)
+- edit: Make precise file edits with exact text replacement, including
+        multiple disjoint edits in one call
+- write: Create or overwrite files
+
+In addition to the tools above, you may have access to other custom
+tools depending on the project.
+
+Guidelines:
+&lt;deduped per-tool guidelines + "Be concise" + "Show file paths clearly"&gt;</code></pre>
+    </div>
+
+    <p>The assembly order of the trailing sections matters: <code>&lt;project_context&gt;</code> (instruction files), then <code>&lt;available_skills&gt;</code>, then always-last the current date and working directory. A project-local <code>SYSTEM.md</code> (only when the project is trusted) can replace the whole identity block; an <code>APPEND_SYSTEM.md</code> adds to it.</p>
+
+    <h3>Context files: AGENTS.md / CLAUDE.md</h3>
+
+    <p>Project-specific instructions live in <code>AGENTS.md</code> (or <code>CLAUDE.md</code>) files. Pi discovers them by walking from the working directory up to the filesystem root, collecting one file per directory, plus a global one from <code>~/.pi/agent</code>. They are injected with a <code>path</code> attribute so the model knows their provenance, and ordered outermost-ancestor first so the most-local instructions (cwd) appear last and take precedence:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">system-prompt.ts — context-file injection</span><span class="code-lang">typescript</span></div>
+<pre><code>prompt += <span class="s">"\n\n&lt;project_context&gt;\n\nProject-specific instructions and guidelines:\n\n"</span>;
+<span class="k">for</span> (<span class="k">const</span> { path: filePath, content } <span class="k">of</span> contextFiles) {
+  prompt += <span class="s">`&lt;project_instructions path="</span>${filePath}<span class="s">"&gt;\n</span>${content}<span class="s">\n&lt;/project_instructions&gt;\n\n`</span>;
+}
+prompt += <span class="s">"&lt;/project_context&gt;\n"</span>;</code></pre>
+    </div>
+
+    <p>This repo's own <code>AGENTS.md</code> (Pi is self-hosting &mdash; it's developed using Pi) is a good example: terse rules about commit style, never running the full test suite, no <code>any</code> in TypeScript, and how to test the TUI under tmux. That file is read into <em>every</em> turn's system prompt when working in the repo.</p>
+
+    <h3>Skills: capabilities loaded on demand</h3>
+
+    <p>A <span class="kt">skill</span> is a folder containing a <code>SKILL.md</code> with YAML frontmatter and a Markdown body of instructions. Skills implement the <a class="ilink" href="https://agentskills.io">Agent Skills</a> standard. The crucial design choice: skills are <strong>not exposed as a tool</strong>. Only their <em>name, description, and file location</em> are injected into the system prompt; the full body is loaded on demand by the model using the ordinary <code>read</code> tool when a task matches the description. This is progressive disclosure at its purest &mdash; a hundred skills cost only their one-line descriptions in context until one is actually needed.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">SKILL.md format + how it appears in the prompt</span><span class="code-lang">text</span></div>
+<pre><code><span class="c"># a skill is a directory with SKILL.md:</span>
+---
+name: pdf-processing
+description: Extract text and tables from PDF files. Use when the user
+             provides a PDF or asks about PDF contents.
+---
+# PDF Processing
+&lt;full instructions, scripts, references — only read when needed&gt;
+
+<span class="c"># injected into the system prompt as just metadata:</span>
+&lt;available_skills&gt;
+  &lt;skill&gt;
+    &lt;name&gt;pdf-processing&lt;/name&gt;
+    &lt;description&gt;Extract text and tables from PDF files…&lt;/description&gt;
+    &lt;location&gt;/abs/path/to/pdf-processing/SKILL.md&lt;/location&gt;
+  &lt;/skill&gt;
+&lt;/available_skills&gt;</code></pre>
+    </div>
+
+    <p>Skills are discovered from global (<code>~/.pi/agent/skills/</code>), project (<code>.pi/skills/</code>, only when trusted), and package locations. <code>description</code> is the only hard requirement &mdash; a skill without one is silently dropped, because the description is precisely what lets the model decide when to load it. Name collisions resolve first-wins by load order. The model can also be forced to load one via the <code>/skill:name</code> slash command, which reads the body and wraps it in a <code>&lt;skill&gt;</code> block. <span class="kt">Prompt templates</span> are the simpler cousin: Markdown snippets invoked as <code>/name</code> that expand inline into the user message with <code>$1</code>/<code>$@</code> argument substitution.</p>
+
+    <div class="callout insight">
+      <div class="callout-label">Three flavors of "extra context", three injection strategies</div>
+      <p><strong>Context files</strong> (AGENTS.md) are <em>always</em> in the prompt &mdash; they're cheap and universally relevant. <strong>Skills</strong> put only a one-line teaser in the prompt and load the body on demand &mdash; many of them, each potentially large. <strong>Prompt templates</strong> aren't in the system prompt at all &mdash; they expand into the user turn when explicitly invoked. The harness matches the injection strategy to the cost and relevance of each resource. That discipline &mdash; never spend context tokens you don't have to &mdash; is the same instinct behind output truncation (Ch.8) and compaction (Ch.7).</p>
+    </div>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 10 -->
+    <span class="section-marker" id="c10">10 &mdash; A Self-Extensible Agent</span>
+    <h2>Extensions &amp; the Hook System</h2>
+
+    <p>Pi describes itself as "self-extensible," and it means it: the docs tell the agent to read its own extension documentation and write extensions on request. An extension is a single TypeScript file with a default-exported factory; it is loaded at runtime (no build step) and given one object, <code>pi: ExtensionAPI</code>, through which it registers tools, commands, keyboard shortcuts, CLI flags, message renderers, model providers, and &mdash; most powerfully &mdash; event handlers that hook the agent loop.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">examples/extensions/hello.ts — a complete extension</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">import</span> { Type } <span class="k">from</span> <span class="s">"@earendil-works/pi-ai"</span>;
+<span class="k">import</span> { defineTool, type <span class="t">ExtensionAPI</span> } <span class="k">from</span> <span class="s">"@earendil-works/pi-coding-agent"</span>;
+
+<span class="k">const</span> helloTool = <span class="f">defineTool</span>({
+  name: <span class="s">"hello"</span>, label: <span class="s">"Hello"</span>, description: <span class="s">"A simple greeting tool"</span>,
+  parameters: <span class="t">Type</span>.<span class="f">Object</span>({ name: <span class="t">Type</span>.<span class="f">String</span>({ description: <span class="s">"Name to greet"</span> }) }),
+  <span class="k">async</span> <span class="f">execute</span>(_id, params) {
+    <span class="k">return</span> { content: [{ type: <span class="s">"text"</span>, text: <span class="s">`Hello, </span>${params.name}<span class="s">!`</span> }], details: {} };
+  },
+});
+
+<span class="k">export default function</span> (pi: <span class="t">ExtensionAPI</span>) {
+  pi.<span class="f">registerTool</span>(helloTool);   <span class="c">// that's it — the LLM can now call hello()</span>
+}</code></pre>
+    </div>
+
+    <h3>The hook surface</h3>
+
+    <p>Beyond registration, extensions subscribe to ~30 event types via <code>pi.on(...)</code>. These map onto the harness hooks from Chapter 5 plus coding-agent-specific events. The reduction semantics &mdash; what a handler's return value <em>does</em> &mdash; vary deliberately by event, and that variety is the heart of the system:</p>
+
+    <div class="dtable-wrap">
+      <table class="dtable">
+        <thead><tr><th>Event</th><th>When</th><th>A handler can…</th><th>Reduction</th></tr></thead>
+        <tbody>
+          <tr><td><code>tool_call</code></td><td>before a tool runs</td><td>block it, or mutate args in place</td><td>first <code>block</code> wins</td></tr>
+          <tr><td><code>tool_result</code></td><td>after a tool runs</td><td>patch content / mark error</td><td>patches accumulate</td></tr>
+          <tr><td><code>context</code></td><td>before each model call</td><td>rewrite the message list</td><td>sequential transform</td></tr>
+          <tr><td><code>before_agent_start</code></td><td>at run start</td><td>inject messages, chain system prompt</td><td>chained</td></tr>
+          <tr><td><code>before_provider_request</code></td><td>before the HTTP call</td><td>patch headers / payload</td><td>threaded</td></tr>
+          <tr><td><code>input</code></td><td>user submits text</td><td>transform or fully handle it</td><td><code>handled</code> short-circuits</td></tr>
+          <tr><td><code>session_before_compact</code></td><td>before compaction</td><td>cancel or supply a summary</td><td>first cancel wins</td></tr>
+          <tr><td><code>message_end</code></td><td>a message finalizes</td><td>replace it (same role)</td><td>chained</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>So a "plan mode" extension can intercept <code>tool_call</code> and block any mutating tool until the user approves; a "rules" extension can inject project conventions via <code>before_agent_start</code>; a redaction extension can scrub secrets in <code>context</code>. The capability surface is broad: registered tools get full TUI renderers (Chapter 11), providers can add entire OAuth flows, and a shared <code>EventBus</code> lets extensions talk to each other.</p>
+
+    <h3>Loading, ordering, and isolation</h3>
+
+    <p>Extensions are discovered one level deep from <code>.pi/extensions/</code> (project, trust-gated), <code>~/.pi/agent/extensions/</code> (global), and configured package paths. They are loaded with <a class="ilink" href="https://github.com/unjs/jiti">jiti</a> &mdash; TypeScript executed at runtime, no precompilation &mdash; with host packages served either from a statically-bundled set (in the Bun binary) or aliased to workspace builds (in Node). The factory is awaited, so async setup completes before the first event fires. Action methods (<code>sendMessage</code>, <code>setModel</code>) throw if called <em>during</em> loading &mdash; they only work once the runner binds the live session.</p>
+
+    <p>Two properties keep the system robust. <strong>Ordering is deterministic</strong>: extensions run in load order, handlers in registration order. <strong>Errors are isolated</strong>: every handler is wrapped so one extension throwing never crashes another or the agent loop &mdash; the error is reported through a listener and execution continues (the one exception being <code>tool_call</code>, where a throw fail-safe-blocks the tool). There is, deliberately, <strong>no sandbox</strong>: extensions run with full host privileges. The only gate is project trust &mdash; project-local extensions don't load until you trust the directory.</p>
+
+    <div class="callout warn">
+      <div class="callout-label">Security boundary</div>
+      <p>Extensions, project skills, and <code>SYSTEM.md</code> can all execute arbitrary code or steer the agent, so they are gated on <strong>project trust</strong>. Pi itself ships no sandbox &mdash; it runs with the launching user's permissions. The docs are explicit that real isolation means containerizing the whole process (a micro-VM, Docker, or a policy sandbox). The harness gives you the trust gate; the OS gives you the cage.</p>
+    </div>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 11 -->
+    <span class="section-marker" id="c11">11 &mdash; Pixels From Strings</span>
+    <h2>The Terminal UI: Differential Rendering From Scratch</h2>
+
+    <p>The interactive experience &mdash; streaming markdown, live diffs, a spinner, inline images, an editor with autocomplete, all redrawing smoothly &mdash; runs on Pi's own terminal UI library, <code>pi-tui</code> (<span class="fp">packages/tui</span>). No ncurses, no React-for-terminal. It is built on one idea: <strong>components produce flat arrays of styled strings, and a diff engine writes the minimum bytes to turn the previous frame into the next.</strong></p>
+
+    <h3>A frame is string[], not a cell grid</h3>
+
+    <p>The surprising core decision: there is no 2D character grid. A frame is just <code>string[]</code> &mdash; one fully-styled string per terminal row, ANSI escapes embedded inline. The component contract is correspondingly tiny:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">packages/tui/src/tui.ts — the entire Component interface</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">export interface</span> <span class="t">Component</span> {
+  <span class="f">render</span>(width: <span class="t">number</span>): <span class="t">string</span>[];   <span class="c">// the only required method; height = array length</span>
+  <span class="f">handleInput</span>?(data: <span class="t">string</span>): <span class="t">void</span>;  <span class="c">// optional: focused input</span>
+  wantsKeyRelease?: <span class="t">boolean</span>;
+  <span class="f">invalidate</span>(): <span class="t">void</span>;             <span class="c">// drop cached render</span>
+}</code></pre>
+    </div>
+
+    <p>The model is <em>retained</em>: you build a long-lived tree of components once and mutate them over time (the root <code>TUI</code> <em>is</em> a <code>Container</code>). Strings are trivially cacheable and comparable with <code>===</code>, and components compose by array concatenation. The price you pay for skipping a cell grid is that every width calculation must be Unicode- and ANSI-aware &mdash; wide CJK chars count as 2, emoji as 2, zero-width marks as 0, escape codes as 0. That cost is paid once, in a width engine (<code>visibleWidth</code>, <code>wrapTextWithAnsi</code>, <code>truncateToWidth</code>) that every component reuses.</p>
+
+    <h3>The diff: rewrite only what changed</h3>
+
+    <p>On each render, the tree produces <code>newLines</code>; the engine compares it line-by-line against the previous frame and rewrites only the changed range. A spinner tick rewrites exactly one line. The whole frame is wrapped in synchronized-output markers (CSI 2026) and written in a single call, so the terminal paints it atomically &mdash; no flicker, no partial frames, minimal bytes (which matters over SSH).</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">tui.ts — the differential scan &amp; atomic write (condensed)</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">let</span> firstChanged = -<span class="n">1</span>, lastChanged = -<span class="n">1</span>;
+<span class="k">for</span> (<span class="k">let</span> i = <span class="n">0</span>; i &lt; <span class="f">Math.max</span>(newLines.length, <span class="k">this</span>.previousLines.length); i++) {
+  <span class="k">if</span> ((<span class="k">this</span>.previousLines[i] ?? <span class="s">""</span>) !== (newLines[i] ?? <span class="s">""</span>)) {
+    <span class="k">if</span> (firstChanged === -<span class="n">1</span>) firstChanged = i;
+    lastChanged = i;
+  }
+}
+<span class="k">let</span> buffer = <span class="s">"\x1b[?2026h"</span>;                  <span class="c">// begin synchronized output (atomic frame)</span>
+<span class="c">// …move cursor to firstChanged (relative moves), \x1b[2K + rewrite each changed line…</span>
+buffer += <span class="s">"\x1b[?2026l"</span>;                       <span class="c">// end synchronized output</span>
+<span class="k">this</span>.terminal.<span class="f">write</span>(buffer);                  <span class="c">// ONE write() for the whole frame</span></code></pre>
+    </div>
+
+    <p>The engine keeps three strategies: a clean first paint, a full clear-and-redraw (when width changes, since wrapping changes, or content shifts above the viewport), and the normal differential update. Cursor motion is entirely <em>relative</em>, with the TUI maintaining its own model of where the hardware cursor is and where the viewport sits &mdash; which lets ordinary terminal scrollback keep the transcript history. One hard rule guards the whole scheme: a line wider than the terminal would corrupt the relative-cursor model, so the renderer treats it as a fatal bug, dumps a crash log, and throws rather than silently garbling the screen.</p>
+
+    <h3>Input, the editor, and images</h3>
+
+    <p>Input flows from raw stdin bytes through a <code>StdinBuffer</code> that splits batched reads into one complete escape sequence per event, then through a key parser that speaks the modern <span class="kt">Kitty keyboard protocol</span> when available (precise modifiers, key-release events) and falls back to <code>modifyOtherKeys</code> and legacy bytes &mdash; negotiated at startup with a clever Device-Attributes sentinel so there's no timeout. The multi-line editor stores text as logical lines with a row/col cursor, navigates by grapheme and by word (via <code>Intl.Segmenter</code>), supports an emacs-style kill-ring and a deep-clone undo stack, collapses large pastes into atomic <code>[paste #1 +40 lines]</code> markers, and drives a fuzzy-matched autocomplete popup for <code>/</code> commands and <code>@</code> file references. Images render through the Kitty graphics or iTerm2 inline-image protocols when detected, falling back to a text placeholder under tmux.</p>
+
+    <h3>How the chat UI wires up</h3>
+
+    <p>The interactive mode (<span class="fp">interactive-mode.ts</span>) builds about eight long-lived containers once &mdash; header, chat transcript, status (the spinner), the editor, footer &mdash; then never diffs the transcript itself. Instead it subscribes to the agent's event stream and mutates components in place: <code>message_start</code> creates one <code>AssistantMessageComponent</code>; each <code>message_update</code> token feeds <code>updateContent</code> on that same component; each tool call gets a <code>ToolExecutionComponent</code> keyed by id. Every handler ends in <code>ui.requestRender()</code>, and the framework's only job is "tree → strings → minimal terminal writes." This is the same event-driven decoupling as everywhere else: the loop emits, the UI reduces and renders.</p>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 12 -->
+    <span class="section-marker" id="c12">12 &mdash; Four Faces, One Engine</span>
+    <h2>Modes: Interactive, Print, RPC, SDK</h2>
+
+    <p>The same <code>AgentSession</code> drives four very different front-ends. This is the payoff of the strict layering: because the agent loop only emits events and the session exposes a clean method surface (<code>prompt</code>, <code>steer</code>, <code>setModel</code>, <code>fork</code>, <code>compact</code>…), you can wrap it in a terminal UI, a one-shot CLI, a JSON-RPC server, or an in-process library without changing the engine.</p>
+
+    <h3>The boot decision</h3>
+
+    <p>The CLI entry (<span class="fp">cli.ts → main.ts</span>) parses argv and collapses it into one of four modes. The decision is a small, legible function &mdash; and notably, piping into or out of <code>pi</code> auto-selects print mode, which is what makes <code>pi -p "..."</code> and shell pipelines work:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">main.ts — resolveAppMode</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">function</span> <span class="f">resolveAppMode</span>(parsed, stdinIsTTY, stdoutIsTTY): <span class="t">AppMode</span> {
+  <span class="k">if</span> (parsed.mode === <span class="s">"rpc"</span>)  <span class="k">return</span> <span class="s">"rpc"</span>;            <span class="c">// --mode rpc</span>
+  <span class="k">if</span> (parsed.mode === <span class="s">"json"</span>) <span class="k">return</span> <span class="s">"json"</span>;           <span class="c">// --mode json (print variant)</span>
+  <span class="k">if</span> (parsed.print || !stdinIsTTY || !stdoutIsTTY) <span class="k">return</span> <span class="s">"print"</span>; <span class="c">// -p, or piped</span>
+  <span class="k">return</span> <span class="s">"interactive"</span>;                                <span class="c">// the default</span>
+}</code></pre>
+    </div>
+
+    <div class="dtable-wrap">
+      <table class="dtable">
+        <thead><tr><th>Mode</th><th>For</th><th>Output</th><th>Prompt semantics</th></tr></thead>
+        <tbody>
+          <tr><td><strong>interactive</strong></td><td>humans at a terminal</td><td>the full TUI (Ch.11)</td><td>REPL loop</td></tr>
+          <tr><td><strong>print</strong> (<code>-p</code>)</td><td>scripts, pipelines</td><td>final assistant text to stdout</td><td>run to completion, serially</td></tr>
+          <tr><td><strong>json</strong></td><td>tools wanting structure</td><td>every event as one JSON line</td><td>run to completion, streamed</td></tr>
+          <tr><td><strong>rpc</strong></td><td>other languages, IDEs</td><td>JSONL request/response + events</td><td>fire-and-forget, ack on preflight</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>RPC: the session, serialized</h3>
+
+    <p>RPC mode is the most revealing, because it shows that the whole agent is controllable through a narrow message protocol. It speaks strict newline-delimited JSON over stdio (deliberately hand-rolled, <em>not</em> Node's <code>readline</code>, because <code>readline</code> splits on Unicode line separators that are legal inside JSON strings). Every message is discriminated by a <code>type</code> field. Commands carry an optional <code>id</code>; responses echo it; <em>events never carry an id</em> &mdash; that's how the client demultiplexes the two streams flowing over the same pipe.</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">modes/rpc/rpc-types.ts — the command union (excerpt)</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">type</span> <span class="t">RpcCommand</span> =
+  | { id?: <span class="t">string</span>; type: <span class="s">"prompt"</span>; message: <span class="t">string</span>; images?: <span class="t">ImageContent</span>[];
+      streamingBehavior?: <span class="s">"steer"</span> | <span class="s">"followUp"</span> }
+  | { id?: <span class="t">string</span>; type: <span class="s">"steer"</span>; message: <span class="t">string</span> }
+  | { id?: <span class="t">string</span>; type: <span class="s">"abort"</span> }
+  | { id?: <span class="t">string</span>; type: <span class="s">"set_model"</span>; provider: <span class="t">string</span>; modelId: <span class="t">string</span> }
+  | { id?: <span class="t">string</span>; type: <span class="s">"compact"</span>; customInstructions?: <span class="t">string</span> }
+  | { id?: <span class="t">string</span>; type: <span class="s">"fork"</span>; entryId: <span class="t">string</span> }
+  | { id?: <span class="t">string</span>; type: <span class="s">"get_state"</span> } | ... ;   <span class="c">// ~30 commands, each ≈ one AgentSession method</span></code></pre>
+    </div>
+
+    <p>The dispatcher is one big <code>switch (command.type)</code>, each branch calling an <code>AgentSession</code> method &mdash; the <em>same</em> methods the in-process SDK exposes. So RPC is, almost literally, the session API serialized to JSON. The <code>prompt</code> command is special: it doesn't await the run; it acknowledges once preflight succeeds and then lets the result stream out as events, so a client can interleave a <code>steer</code> while the agent works. The other side, <code>RpcClient</code>, spawns <code>pi --mode rpc</code> as a subprocess and offers typed promise-returning methods over the same framing &mdash; the basis for embedding Pi from any language.</p>
+
+    <h3>SDK: skip the subprocess</h3>
+
+    <p>For Node/TypeScript callers there's a more direct path: <code>createAgentSession(options)</code> builds an <code>AgentSession</code> in-process. You pick the model, tools, resource loaders, and session storage, then drive the returned session directly &mdash; type-safe, no serialization. The interactive, print, and RPC modes are themselves just three consumers of this factory plus a thin <code>AgentSessionRuntime</code> that handles swapping the active session (new / switch / fork / clone). Same engine, four faces.</p>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 13 -->
+    <span class="section-marker" id="c13">13 &mdash; What Makes It Hold Together</span>
+    <h2>The Design Principles</h2>
+
+    <p>We have walked the whole machine bottom to top. Step back and the same handful of principles recur at every layer &mdash; and they are what separate a harness that survives real use from a demo that falls over. If you take nothing else from this dissection, take these.</p>
+
+    <h3>1. Errors are values, not exceptions</h3>
+    <p>The provider layer's stream function is <em>contractually forbidden</em> from throwing; failures arrive as an <code>AssistantMessage</code> with <code>stopReason: "error"</code>. A tool that throws is caught and converted to a tool result with <code>isError: true</code>. The result is that the agent loop has almost no error-handling code &mdash; it just checks <code>stopReason</code> and feeds tool errors back to the model, which can read them and retry. Failure becomes ordinary data flowing through the same path as success.</p>
+
+    <h3>2. Decouple production from consumption</h3>
+    <p>The <code>EventStream</code> separates a provider's network read-loop from whoever consumes it. The agent loop <code>emit</code>s a typed event stream rather than calling a UI. The harness's save points let it await persistence and hooks without blocking the provider transport. This single pattern &mdash; producers push events, consumers pull at their own pace &mdash; is what lets one engine drive a TUI, an SDK, and an RPC server, and what keeps streaming smooth under backpressure.</p>
+
+    <h3>3. Snapshot the volatile, never mutate in flight</h3>
+    <p>A provider request reads only a frozen turn snapshot. Change the model, tools, or thinking level mid-run and the change lands at the next save point, never corrupting the request in flight. Compaction cuts only on turn boundaries. The file mutation queue serializes writes per file. Everywhere mutability meets concurrency, Pi inserts a boundary &mdash; a snapshot, a save point, a queue &mdash; so that "change it while it's running" is safe by construction rather than by luck.</p>
+
+    <h3>4. Progressive disclosure of context</h3>
+    <p>Context tokens are the scarcest resource, so the harness spends them grudgingly. Skills put a one-line teaser in the prompt and load the body on demand. Pi's own docs are referenced by path, not inlined. Large tool output is truncated with an actionable pointer to the full spill file. Long histories are compacted into structured summaries. The recurring instinct: keep the always-on footprint minimal, and load detail only when a task actually needs it.</p>
+
+    <h3>5. Append-only state is resumable state</h3>
+    <p>The session is a tree of immutable entries &mdash; messages <em>and</em> configuration changes <em>and</em> the current-position pointer. Nothing is mutated; branches are new edges; "undo" is moving a pointer. Because the entire history is a replayable log, resuming a session is just "walk from the leaf to the root and fold," and full crash recovery becomes a tractable design problem rather than a rewrite.</p>
+
+    <h3>6. Draw boundaries you can defend with types</h3>
+    <p>Four packages, dependencies strictly downward. The model is self-describing so cross-provider replay is decidable. Hook events carry their result type as a phantom so the compiler knows which may return a value. The <code>compat</code> flag type is keyed on the model's API so the wrong flags can't be set. Public failures are normalized to one error type with a stable code. The boundaries aren't just conventions &mdash; they're encoded so the type checker enforces them.</p>
+
+    <div class="callout result">
+      <div class="callout-label">The whole machine, in one breath</div>
+      <p>A coding agent is a tiny loop wrapped in a large amount of careful engineering. <strong>pi-ai</strong> turns nine LLM dialects into one never-throwing <code>streamSimple</code>. The <strong>agent loop</strong> turns that into turns, executing tools and emitting events. The <strong>Agent</strong> adds a transcript, queues, and settlement; the <strong>AgentHarness</strong> adds phases, snapshots, durable writes, and hooks. <strong>Sessions</strong> make the conversation an append-only tree; <strong>compaction</strong> keeps it inside the window. <strong>Tools</strong> act on the world with bounded output and serialized mutations; the <strong>system prompt, skills, and context files</strong> tell the model who it is via progressive disclosure. <strong>Extensions</strong> hang new behavior off the hooks; <strong>pi-tui</strong> renders it all with a string-diff; and four <strong>modes</strong> expose the same session as a CLI, a pipe, a JSON stream, and an RPC server. None of it is the model. All of it is the harness.</p>
+    </div>
+
+    <h3>Where to go next</h3>
+    <p>Read the source &mdash; it's MIT-licensed and unusually clean. Start with <code>packages/agent/src/agent-loop.ts</code> (the spine), then <code>packages/agent/src/harness/agent-harness.ts</code> (the orchestration), then <code>packages/agent/docs/</code> (the design rationale, written candidly for Pi's own agent to read). If you're building your own harness, you now have the full parts list and, more importantly, the reasons each part is shaped the way it is. The loop is the easy part. Everything around it is the craft.</p>
+
+    <div class="footnotes" id="notes">
+      <div class="footnotes-title">Notes &amp; Sources</div>
+      <div class="footnote"><span class="fn-num">[*]</span><span>All code is quoted from the Pi repository at <a class="ilink" href="https://github.com/earendil-works/pi">github.com/earendil-works/pi</a> (<code>main</code>), MIT-licensed by earendil-works. Paths are given inline. Snippets are lightly condensed (comments trimmed, whitespace normalized) but otherwise verbatim; ellipses mark elisions.</span></div>
+      <div class="footnote"><span class="fn-num">[1]</span><span>Pi's own design documents under <code>packages/agent/docs/</code> (<code>agent-harness.md</code>, <code>durable-harness.md</code>, <code>hooks.md</code>, <code>observability.md</code>) are unusually candid about intent and trade-offs, and were primary sources for the orchestration chapters.</span></div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <span>Distilled &middot; Anatomy of a Coding Agent Harness</span>
+    <a href="../index.html">More explainers &rarr;</a>
+  </div>
+</footer>
+
+<script>
+const pf=document.getElementById('progress');
+function up(){const h=document.documentElement;const s=h.scrollTop;const max=h.scrollHeight-h.clientHeight;pf.style.width=(max>0?(s/max*100):0)+'%';}
+document.addEventListener('scroll',up,{passive:true});up();
+</script>
+</body>
+</html>
