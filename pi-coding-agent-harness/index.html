@@ -158,7 +158,7 @@ footer{border-top:1px solid var(--border);padding:2rem;margin-top:4rem;}
     <div class="post-meta">
       <span class="post-category">AI Engineering</span>
       <span class="post-date">2026</span>
-      <span class="post-read">~70 min read</span>
+      <span class="post-read">~85 min read</span>
     </div>
     <h1 class="post-title">Anatomy of a Coding Agent Harness</h1>
     <p class="post-subtitle">An LLM can write code. It cannot read your files, run your tests, or remember what it did five minutes ago. The harness is everything that turns a text predictor into an agent &mdash; and almost none of it is the model. A complete dissection of <em>Pi</em>, line by line.</p>
@@ -180,7 +180,7 @@ footer{border-top:1px solid var(--border);padding:2rem;margin-top:4rem;}
     </div>
 
     <nav class="toc">
-      <div class="toc-title">The thirteen chapters</div>
+      <div class="toc-title">The fifteen chapters</div>
       <ol>
         <li><a href="#c1">What a Harness Actually Is</a> <span class="toc-sub">— the loop, the four layers, separation of concerns</span></li>
         <li><a href="#c2">The Provider Layer</a> <span class="toc-sub">— one API for nine wire formats</span></li>
@@ -189,12 +189,14 @@ footer{border-top:1px solid var(--border);padding:2rem;margin-top:4rem;}
         <li><a href="#c5">The Orchestrator</a> <span class="toc-sub">— AgentHarness: phases, snapshots, hooks</span></li>
         <li><a href="#c6">Sessions &amp; Persistence</a> <span class="toc-sub">— an append-only conversation tree</span></li>
         <li><a href="#c7">Context Management &amp; Compaction</a> <span class="toc-sub">— surviving the context window</span></li>
-        <li><a href="#c8">The Tools</a> <span class="toc-sub">— bash, edit, read, and the file mutation queue</span></li>
-        <li><a href="#c9">System Prompt, Skills &amp; Context Files</a> <span class="toc-sub">— progressive disclosure</span></li>
-        <li><a href="#c10">Extensions &amp; the Hook System</a> <span class="toc-sub">— a self-extensible agent</span></li>
-        <li><a href="#c11">The Terminal UI</a> <span class="toc-sub">— differential rendering from scratch</span></li>
-        <li><a href="#c12">Modes: Interactive, Print, RPC, SDK</a> <span class="toc-sub">— the same engine, four faces</span></li>
-        <li><a href="#c13">The Design Principles</a> <span class="toc-sub">— what makes it hold together</span></li>
+        <li><a href="#c8">Memory: What the Agent Remembers</a> <span class="toc-sub">— three layers, and when each changes</span></li>
+        <li><a href="#c9">The Tools</a> <span class="toc-sub">— bash, edit, read, and the file mutation queue</span></li>
+        <li><a href="#c10">Tool Calling: Decision &amp; Invocation</a> <span class="toc-sub">— advertise → decide → validate → run → loop</span></li>
+        <li><a href="#c11">System Prompt, Skills &amp; Context Files</a> <span class="toc-sub">— progressive disclosure</span></li>
+        <li><a href="#c12">Extensions &amp; the Hook System</a> <span class="toc-sub">— a self-extensible agent</span></li>
+        <li><a href="#c13">The Terminal UI</a> <span class="toc-sub">— differential rendering from scratch</span></li>
+        <li><a href="#c14">Modes: Interactive, Print, RPC, SDK</a> <span class="toc-sub">— the same engine, four faces</span></li>
+        <li><a href="#c15">The Design Principles</a> <span class="toc-sub">— what makes it hold together</span></li>
       </ol>
     </nav>
 
@@ -269,9 +271,9 @@ footer{border-top:1px solid var(--border);padding:2rem;margin-top:4rem;}
 
     <ul>
       <li><code>model.stream(...)</code> &mdash; which model? Anthropic, OpenAI, Google, and a dozen OpenAI-compatible clones each have <em>different</em> request shapes, streaming formats, tool-call encodings, reasoning parameters, and authentication. <strong>Chapter 2.</strong></li>
-      <li><code>messages.push(reply)</code> &mdash; messages must be persisted so you can resume tomorrow, branched so you can explore alternatives, and <em>compacted</em> when they outgrow the context window. <strong>Chapters 6 &amp; 7.</strong></li>
-      <li><code>runTool(...)</code> &mdash; the tool might be <code>bash</code> spawning a process tree, or <code>edit</code> doing a surgical string replacement that must not race a concurrent write. Output might be 40&nbsp;MB. <strong>Chapter 8.</strong></li>
-      <li>The loop itself must be <em>interruptible</em> (the user wants to steer), <em>observable</em> (the UI must render streaming tokens), and <em>extensible</em> (third parties add tools and hooks). <strong>Chapters 3&ndash;5, 10&ndash;11.</strong></li>
+      <li><code>messages.push(reply)</code> &mdash; messages must be persisted so you can resume tomorrow, branched so you can explore alternatives, and <em>compacted</em> when they outgrow the context window. <strong>Chapters 6&ndash;8.</strong></li>
+      <li><code>runTool(...)</code> &mdash; the tool might be <code>bash</code> spawning a process tree, or <code>edit</code> doing a surgical string replacement that must not race a concurrent write. Output might be 40&nbsp;MB. The model decides which tool to call and when to stop. <strong>Chapters 9 &amp; 10.</strong></li>
+      <li>The loop itself must be <em>interruptible</em> (the user wants to steer), <em>observable</em> (the UI must render streaming tokens), and <em>extensible</em> (third parties add tools and hooks). <strong>Chapters 3&ndash;5, 12&ndash;13.</strong></li>
     </ul>
 
     <p>The art of harness design is drawing boundaries so that each swamp is drained in isolation. Pi draws them as four packages.</p>
@@ -386,7 +388,7 @@ SessionTreeEntry[]  ──►  AgentMessage[]  ──►  Message[]  ──►  
 
     <p>Two choices here pay off for the rest of the system. First, the assistant message is <span class="kt">self-describing</span>: it records the <code>api</code>, <code>provider</code>, and <code>model</code> that produced it. That single fact is what makes <em>cross-provider handoff</em> possible &mdash; when you replay a transcript to a different model, the layer can tell "this was me" from "this was a foreign model" and handle reasoning blocks accordingly. Second, a tool call is just a <code>ToolCall</code> block <em>inside</em> the assistant's content array, and its result is a separate <code>toolResult</code> message keyed by <code>toolCallId</code>. This representation is provider-neutral; each provider maps it to its own native shape (Anthropic <code>tool_use</code>/<code>tool_result</code>, OpenAI <code>function_call</code>/<code>function_call_output</code>, Google <code>functionCall</code>/<code>functionResponse</code>).</p>
 
-    <p>Token accounting rides along on every assistant message. <code>Usage</code> tracks <code>input</code>, <code>output</code>, <code>cacheRead</code>, <code>cacheWrite</code> (with a separate <code>cacheWrite1h</code> for Anthropic's 1-hour cache, billed at 2&times;), plus a computed <code>cost</code> breakdown in dollars. The harness reads these numbers to decide when to compact (Chapter 7) and to render the footer (Chapter 11).</p>
+    <p>Token accounting rides along on every assistant message. <code>Usage</code> tracks <code>input</code>, <code>output</code>, <code>cacheRead</code>, <code>cacheWrite</code> (with a separate <code>cacheWrite1h</code> for Anthropic's 1-hour cache, billed at 2&times;), plus a computed <code>cost</code> breakdown in dollars. The harness reads these numbers to decide when to compact (Chapter 7) and to render the footer (Chapter 13).</p>
 
     <h3>Streaming: errors are values, not exceptions</h3>
 
@@ -771,7 +773,7 @@ SessionTreeEntry[]  ──►  AgentMessage[]  ──►  Message[]  ──►  
 <span class="k">interface</span> <span class="t">MessageEndEvent</span> <span class="k">extends</span> <span class="t">HookEvent</span>&lt;<span class="s">"message_end"</span>&gt; { message: <span class="t">AgentMessage</span>; }</code></pre>
     </div>
 
-    <p>Different hooks have different reduction semantics, and getting these right is most of the work: <code>context</code> and <code>before_provider_payload</code> are <em>sequential transforms</em> (each handler sees the previous one's output); <code>tool_call</code> is <em>early-exit on block</em>; <code>tool_result</code> is <em>patch accumulation</em>; <code>session_before_compact</code> is <em>early-exit on cancel</em>. The coding agent's extension system (Chapter 10) is built almost entirely on these hooks.</p>
+    <p>Different hooks have different reduction semantics, and getting these right is most of the work: <code>context</code> and <code>before_provider_payload</code> are <em>sequential transforms</em> (each handler sees the previous one's output); <code>tool_call</code> is <em>early-exit on block</em>; <code>tool_result</code> is <em>patch accumulation</em>; <code>session_before_compact</code> is <em>early-exit on cancel</em>. The coding agent's extension system (Chapter 12) is built almost entirely on these hooks.</p>
 
     <div class="callout note">
       <div class="callout-label">Toward durability</div>
@@ -1004,8 +1006,127 @@ and error messages.</code></pre>
 
     <hr class="section-sep">
 
-    <!-- ════════════════════════════════════════════════ CHAPTER 8 -->
-    <span class="section-marker" id="c8">08 &mdash; Acting on the World</span>
+    <!-- ════════════════════════════════════════════════ CHAPTER 8 (memory) -->
+    <span class="section-marker" id="c8">08 &mdash; What the Agent Remembers</span>
+    <h2>Memory: What the Agent Remembers, and When</h2>
+
+    <p>"Memory" is the word people reach for when they ask how an agent remembers what it did. It's worth being precise, because the term hides three very different mechanisms &mdash; and because Pi's answer is, deliberately, <em>not</em> the one you might expect. Let's set the expectation up front, then build the real picture.</p>
+
+    <div class="callout warn">
+      <div class="callout-label">What Pi does not have</div>
+      <p>Pi has <strong>no autonomous memory subsystem</strong>: no <code>memory</code> tool, no embedding store, no background process that extracts "facts" and decides to add, update, or prune them. Grep the entire repo for "memory" and every hit is either an <em>in-memory session storage backend</em> (a test/SDK alternative to JSONL files) or the project-trust <em>"remember my choice"</em> flag. The model never curates a memory store. So the question "how does the agent decide to add/update/prune memory?" has a sharp answer for Pi: <strong>it mostly doesn't decide &mdash; the harness manages context deterministically.</strong> Understanding <em>why</em> a production agent can get away with this is the point of the chapter.</p>
+    </div>
+
+    <p>What Pi has instead is three layers of memory, each with a completely different lifecycle and a different owner of the "when does it change" decision:</p>
+
+    <div class="fig">
+      <div class="fig-label">Figure 5 &mdash; The three layers of agent memory</div>
+      <svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" font-family="DM Sans, sans-serif">
+        <!-- working -->
+        <rect x="30" y="20" width="660" height="84" rx="7" fill="#eef3fc" stroke="#2a5db0" stroke-width="1.5"/>
+        <text x="48" y="44" font-size="13" fill="#2a5db0" font-weight="600">1 · Working memory — the conversation transcript (session tree)</text>
+        <text x="48" y="64" font-size="10.5" fill="#5a5852">Every user / assistant / tool-result message, appended forever. Owner of change: the loop (automatic).</text>
+        <text x="48" y="79" font-size="10.5" fill="#5a5852">Add = always (append-only). Update = never (edits create branches). Prune = never on disk.</text>
+        <text x="48" y="94" font-size="10.5" fill="#7a7870" font-style="italic">→ Chapter 6. Durable, resumable, the source of truth.</text>
+        <!-- context -->
+        <rect x="30" y="116" width="660" height="84" rx="7" fill="#f2ecfa" stroke="#6b3fa0" stroke-width="1.5"/>
+        <text x="48" y="140" font-size="13" fill="#6b3fa0" font-weight="600">2 · Context memory — what actually fits in the window this turn</text>
+        <text x="48" y="160" font-size="10.5" fill="#5a5852">The slice of the transcript sent to the model. Owner of change: the harness (token threshold).</text>
+        <text x="48" y="175" font-size="10.5" fill="#5a5852">Add = build from leaf→root. Prune/Update = compaction replaces old prefix with a structured summary.</text>
+        <text x="48" y="190" font-size="10.5" fill="#7a7870" font-style="italic">→ Chapter 7. The only layer where "pruning" actually happens.</text>
+        <!-- longterm -->
+        <rect x="30" y="212" width="660" height="88" rx="7" fill="#eaf5ee" stroke="#1a7a4a" stroke-width="1.5"/>
+        <text x="48" y="236" font-size="13" fill="#1a7a4a" font-weight="600">3 · Long-term memory — files on disk the agent reads &amp; writes</text>
+        <text x="48" y="256" font-size="10.5" fill="#5a5852">AGENTS.md / CLAUDE.md (always injected), skills (on-demand), and the session files themselves.</text>
+        <text x="48" y="271" font-size="10.5" fill="#5a5852">Owner of change: humans, or the model using the ordinary edit/write tools — there is no special API.</text>
+        <text x="48" y="287" font-size="10.5" fill="#7a7870" font-style="italic">→ Chapter 11. Cross-session, human-readable, version-controllable.</text>
+      </svg>
+      <div class="fig-cap">Three layers, three owners of the "when does it change" decision. Only layer 2 prunes, and that decision is the harness's (a token threshold), not the model's. Layer 3 is the only place the <em>model</em> can deliberately write something to remember &mdash; and it does so with the same <code>edit</code> tool it uses for any file.</div>
+    </div>
+
+    <h3>Layer 1 — Working memory: append-only, never pruned</h3>
+
+    <p>The transcript is the session tree from Chapter 6. The decision logic here is the simplest possible: <strong>everything is remembered, always.</strong> Each message the loop produces is appended as an immutable entry the moment it finalizes &mdash; the harness persists on <code>message_end</code>, before notifying subscribers, so transcript order on disk is deterministic:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">agent-harness.ts — every message is remembered the instant it ends</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">private async</span> <span class="f">handleAgentEvent</span>(event: <span class="t">AgentEvent</span>, signal?): <span class="t">Promise</span>&lt;<span class="t">void</span>&gt; {
+  <span class="k">if</span> (event.type === <span class="s">"message_end"</span>) {
+    <span class="k">await</span> <span class="k">this</span>.session.<span class="f">appendMessage</span>(event.message); <span class="c">// add to working memory — no decision, no filter</span>
+    <span class="k">await</span> <span class="k">this</span>.<span class="f">emitAny</span>(event, signal);
+    <span class="k">return</span>;
+  }
+  ...
+}</code></pre>
+    </div>
+
+    <p>There is no "is this worth remembering?" gate. The agent does not summarize-as-it-goes or tag salient facts. <span class="kt">Update</span> never happens: messages are immutable, and "editing" an earlier message creates a new branch (a sibling node) rather than mutating the old one (Chapter 6, Figure 4). <span class="kt">Prune</span> never happens on disk: abandoned branches live forever. This is a deliberate trade &mdash; storage is cheap, and an immutable log is trivially resumable and auditable. The cost (an ever-growing transcript) is paid down not here but in layer 2.</p>
+
+    <h3>Layer 2 — Context memory: the only place pruning happens</h3>
+
+    <p>The model can't be sent the whole tree &mdash; it has a finite window. So before every turn the harness <em>builds context</em> by walking from the current leaf to the root (Chapter 6's <code>buildSessionContext</code>). That walk is itself a memory decision: <strong>only the active branch is remembered; sibling branches are invisible.</strong> Switching branches changes what the agent "knows" without deleting anything.</p>
+
+    <p>When even the active branch outgrows the window, <span class="kt">compaction</span> prunes it &mdash; and this is the one place in Pi where add/update/prune of memory is an explicit, automated decision. Critically, <em>the harness owns this decision, not the model.</em> It's a token threshold, checked after each turn:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">compaction.ts — the prune decision is a deterministic threshold</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">export function</span> <span class="f">shouldCompact</span>(contextTokens, contextWindow, settings): <span class="t">boolean</span> {
+  <span class="k">return</span> settings.enabled &amp;&amp; contextTokens &gt; contextWindow - settings.reserveTokens;
+}
+<span class="c">// reserveTokens = 16384 (headroom), keepRecentTokens = 20000 (what survives)</span>
+<span class="c">// checked after each turn via the loop's shouldStopAfterTurn hook (Ch.3)</span></code></pre>
+    </div>
+
+    <p>Mapping this onto the user's mental model of "memory operations":</p>
+
+    <div class="dtable-wrap">
+      <table class="dtable">
+        <thead><tr><th>Operation</th><th>When it fires</th><th>What decides</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Add</strong></td><td>every turn</td><td>the loop (automatic)</td><td>new messages appended to the tree; context rebuilt leaf→root</td></tr>
+          <tr><td><strong>Prune</strong></td><td>context &gt; window &minus; 16K</td><td>harness token threshold</td><td>old prefix removed from context (still on disk), cut on a turn boundary</td></tr>
+          <tr><td><strong>Summarize</strong></td><td>at the prune point</td><td>harness, via a model call</td><td>pruned prefix → a structured checkpoint summary message</td></tr>
+          <tr><td><strong>Update</strong></td><td>next compaction</td><td>harness, incrementally</td><td>previous summary + new turns → a refreshed summary (prior facts preserved)</td></tr>
+          <tr><td><strong>Branch-forget</strong></td><td>navigating away</td><td>user / extension</td><td>the left branch is summarized into a <code>branch_summary</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>The "update" row is the closest Pi comes to memory curation, and it's worth dwelling on: compaction is <em>incremental</em>. A second compaction doesn't re-summarize raw history &mdash; it feeds the model the <em>previous</em> summary plus the new turns and a distinct <code>UPDATE_SUMMARIZATION_PROMPT</code> instructing it to "PRESERVE all existing information… move items from In Progress to Done… remove what's no longer relevant." So the structured checkpoint (Goal / Progress / Decisions / Next Steps) <em>evolves</em> across compactions like a living document. That is genuine memory management &mdash; but it operates on the conversation summary, not on a store of discrete facts, and the trigger is always the token budget, never the model deciding "this is important."</p>
+
+    <h3>Layer 3 — Long-term memory: the agent writes a file</h3>
+
+    <p>So how does an agent remember something <em>across</em> sessions &mdash; a convention, a gotcha, the location of a config? Pi's answer is refreshingly low-tech: <strong>it writes it to a file the harness always loads.</strong> The <code>AGENTS.md</code> / <code>CLAUDE.md</code> context files (Chapter 11) are injected into every system prompt. The agent can update this persistent memory using the exact same <code>edit</code> tool it uses for source code &mdash; there is no special memory API, and that's the point:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">the "remember this for next time" pattern — just an edit</span><span class="code-lang">text</span></div>
+<pre><code>User:  "the tests need PG running on 5433, not 5432 — note that for next time"
+
+Agent: edit(AGENTS.md, oldText="## Testing", newText="## Testing\n
+       - Postgres must run on port 5433 (not the default 5432) for the suite")
+       <span class="c">→ next session, AGENTS.md is injected into the system prompt automatically,</span>
+       <span class="c">  so the fact is "remembered" with zero memory infrastructure.</span></code></pre>
+    </div>
+
+    <p>This is memory as a <em>file</em>: human-readable, diff-able, committable to git, and editable by both human and agent. Skills (Chapter 11) are the procedural cousin &mdash; reusable "how to do X" memory, loaded on demand. The session files themselves are the third form of durable memory: <code>pi --resume</code> reconstructs the entire tree, so "what we were doing yesterday" survives by default.</p>
+
+    <h3>Why minimalism works &mdash; and how you'd add more</h3>
+
+    <p>Pi's bet is that for a <em>coding</em> agent, the repository <em>is</em> the long-term memory. The files, the git history, the <code>AGENTS.md</code> &mdash; that is the durable state worth keeping, and the agent already has first-class tools to read and write it. A separate fact store would duplicate it and risk drift. Within a session, an append-only log plus threshold compaction is enough to stay inside the window without ever asking the model to play librarian.</p>
+
+    <p>If you <em>did</em> want mem0-style autonomous memory &mdash; the agent extracting and recalling discrete facts &mdash; Pi gives you the exact seams to build it as an extension, no core changes needed (Chapter 12):</p>
+    <ul>
+      <li>Register a <code>remember</code> tool so the model can deliberately store a fact (write it to your store of choice).</li>
+      <li>Hook the <code>context</code> event to retrieve relevant memories and inject them as messages before each model call.</li>
+      <li>Hook <code>tool_result</code> or <code>message_end</code> to passively harvest facts as the conversation proceeds.</li>
+      <li>Hook <code>session_before_compact</code> to persist anything important before it's summarized away.</li>
+    </ul>
+    <p>That those four hooks are <em>exactly</em> the integration points a memory system needs is not a coincidence &mdash; it's the payoff of building the harness as a set of well-placed seams (Chapter 5). Pi ships the minimal policy and lets you layer on more.</p>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 9 (tools) -->
+    <span class="section-marker" id="c9">09 &mdash; Acting on the World</span>
     <h2>The Tools</h2>
 
     <p>Tools are how the model touches reality. Everything else in this piece is plumbing to get a tool call from the model and a result back; the tools themselves are where the agent reads your files and runs your commands. Pi (<span class="fp">packages/coding-agent/src/core/tools/</span>) ships exactly <strong>seven</strong> built-ins &mdash; <code>read</code>, <code>bash</code>, <code>edit</code>, <code>write</code>, <code>grep</code>, <code>find</code>, <code>ls</code> &mdash; and the default coding profile enables just four of them (<code>read</code>, <code>bash</code>, <code>edit</code>, <code>write</code>), letting <code>bash</code> subsume search and listing. The design lessons are concentrated in three of them: <code>bash</code>, <code>edit</code>, and the truncation strategy they share.</p>
@@ -1097,7 +1218,152 @@ and error messages.</code></pre>
     <hr class="section-sep">
 
     <!-- ════════════════════════════════════════════════ CHAPTER 9 -->
-    <span class="section-marker" id="c9">09 &mdash; Telling the Model Who It Is</span>
+    <!-- ════════════════════════════════════════════════ CHAPTER 10 (tool calling) -->
+    <span class="section-marker" id="c10">10 &mdash; Decision &amp; Invocation</span>
+    <h2>Tool Calling: Decision, Invocation, and the Feedback Loop</h2>
+
+    <p>Chapter 9 catalogued the tools. This chapter is about the <em>verb</em> &mdash; how a tool actually gets called: how the menu is shown to the model, how the model decides which item to order, how the harness validates and runs it, and how the result loops back to drive the next decision. We've seen pieces of this in Chapters 2, 3, and 5; here is the whole lifecycle in one place, because "how does the agent decide what to do" is the question that most often gets hand-waved.</p>
+
+    <div class="fig">
+      <div class="fig-label">Figure 6 &mdash; The full lifecycle of one tool call</div>
+      <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" font-family="DM Sans, sans-serif">
+        <defs><marker id="ah6" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#7a7870"/></marker></defs>
+        <rect x="250" y="14" width="220" height="46" rx="6" fill="#fdf0e8" stroke="#c4622d"/>
+        <text x="360" y="33" text-anchor="middle" font-size="11.5" fill="#c4622d" font-weight="600">1 · ADVERTISE</text>
+        <text x="360" y="49" text-anchor="middle" font-size="9.5" fill="#7a7870">name+schema (tools API) + snippets (prompt)</text>
+        <rect x="250" y="74" width="220" height="46" rx="6" fill="#eef3fc" stroke="#2a5db0"/>
+        <text x="360" y="93" text-anchor="middle" font-size="11.5" fill="#2a5db0" font-weight="600">2 · DECIDE (the model)</text>
+        <text x="360" y="109" text-anchor="middle" font-size="9.5" fill="#7a7870">emits a toolCall block, not prose</text>
+        <rect x="250" y="134" width="220" height="46" rx="6" fill="#f2ecfa" stroke="#6b3fa0"/>
+        <text x="360" y="153" text-anchor="middle" font-size="11.5" fill="#6b3fa0" font-weight="600">3 · VALIDATE</text>
+        <text x="360" y="169" text-anchor="middle" font-size="9.5" fill="#7a7870">TypeBox coerce + check args</text>
+        <rect x="250" y="194" width="220" height="46" rx="6" fill="#f2ecfa" stroke="#6b3fa0"/>
+        <text x="360" y="213" text-anchor="middle" font-size="11.5" fill="#6b3fa0" font-weight="600">4 · GATE (beforeToolCall)</text>
+        <text x="360" y="229" text-anchor="middle" font-size="9.5" fill="#7a7870">hook may block / mutate args</text>
+        <rect x="250" y="254" width="220" height="46" rx="6" fill="#eaf5ee" stroke="#1a7a4a"/>
+        <text x="360" y="273" text-anchor="middle" font-size="11.5" fill="#1a7a4a" font-weight="600">5 · EXECUTE + FINALIZE</text>
+        <text x="360" y="289" text-anchor="middle" font-size="9.5" fill="#7a7870">run, stream onUpdate, afterToolCall patch</text>
+        <rect x="250" y="314" width="220" height="40" rx="6" fill="#f3f1ec" stroke="#7a7870"/>
+        <text x="360" y="338" text-anchor="middle" font-size="11" fill="#1c1c1a" font-weight="600">6 · toolResult appended → next turn</text>
+        <!-- down arrows -->
+        <g stroke="#7a7870" stroke-width="1.4" fill="none">
+        <path d="M360 60 L360 72" marker-end="url(#ah6)"/>
+        <path d="M360 120 L360 132" marker-end="url(#ah6)"/>
+        <path d="M360 180 L360 192" marker-end="url(#ah6)"/>
+        <path d="M360 240 L360 252" marker-end="url(#ah6)"/>
+        <path d="M360 300 L360 312" marker-end="url(#ah6)"/>
+        </g>
+        <!-- feedback loop -->
+        <path d="M250 334 C 80 320, 60 120, 248 95" fill="none" stroke="#1a7a4a" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#ah6)"/>
+        <text x="70" y="220" font-size="9.5" fill="#1a7a4a" transform="rotate(-90 70 220)">model reads result, decides again</text>
+        <!-- error side-loops -->
+        <path d="M470 157 C 560 157, 560 95, 472 92" fill="none" stroke="#c0392b" stroke-width="1.3" stroke-dasharray="3 3" marker-end="url(#ah6)"/>
+        <text x="582" y="128" font-size="9" fill="#c0392b">invalid → error</text>
+        <text x="582" y="142" font-size="9" fill="#c0392b">back to model</text>
+      </svg>
+      <div class="fig-cap">Six stages. The harness owns 1, 3, 4, 5, 6; the <em>model</em> owns only stage 2. Validation failures and blocks don't crash &mdash; they become tool-result errors the model reads and corrects (the red loop). The green loop &mdash; result feeds the next decision &mdash; is the engine of agentic behavior.</div>
+    </div>
+
+    <h3>Stage 1 — Advertisement: how the model learns the menu</h3>
+
+    <p>The model can only call what it's told exists, and it's told in two channels with different jobs. The <strong>tools API parameter</strong> carries the machine contract: each active tool's <code>name</code>, full <code>description</code>, and JSON-Schema <code>parameters</code>, sent with every request. The <strong>system prompt</strong> carries the human-style guidance: a one-line snippet per tool and deduped <code>promptGuidelines</code> that shape <em>when</em> to prefer one over another (Chapter 11). The harness assembles the active set per turn in <code>createTurnState</code>:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">agent-harness.ts — only the ACTIVE tools are advertised</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">const</span> tools = [...<span class="k">this</span>.tools.values()];
+<span class="k">const</span> activeTools = <span class="k">this</span>.activeToolNames
+  .<span class="f">map</span>((name) =&gt; <span class="k">this</span>.tools.<span class="f">get</span>(name))
+  .<span class="f">filter</span>((tool): tool is <span class="t">TTool</span> =&gt; tool !== <span class="k">undefined</span>); <span class="c">// the menu for THIS turn</span>
+<span class="c">// …activeTools become context.tools, which the provider serializes into</span>
+<span class="c">// its tool-definition wire format (Anthropic input_schema / OpenAI parameters / …)</span></code></pre>
+    </div>
+
+    <p>This is a control point: the active set is configurable per turn (<code>setActiveTools</code>, allow/deny lists, <code>noTools</code>). A "plan mode" extension shrinks the menu to read-only tools so the model <em>cannot</em> choose a mutating action until you approve. The harness shapes the decision by curating what's even on the table.</p>
+
+    <h3>Stage 2 — Decision: this is the model's job, and only the model's</h3>
+
+    <p>Here is the honest core of "how does the agent decide": <strong>it is an emergent choice made by the LLM</strong>, conditioned on the tool descriptions, the system-prompt guidelines, and the conversation so far (including every prior tool result). The harness does not contain a planner or a policy that picks tools. It curates the menu and writes good descriptions; the model orders from it. When the model decides, it doesn't write prose &mdash; it emits a structured <code>toolCall</code> block inside its assistant message (Chapter 2), streamed token-by-token as <code>toolcall_start / delta / end</code> with the arguments accumulating as JSON:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">the unified tool-call block (provider-neutral)</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">interface</span> <span class="t">ToolCall</span> {
+  type: <span class="s">"toolCall"</span>;
+  id: <span class="t">string</span>;                       <span class="c">// correlates with the eventual toolResult</span>
+  name: <span class="t">string</span>;                     <span class="c">// which menu item</span>
+  arguments: <span class="t">Record</span>&lt;<span class="t">string</span>, <span class="k">any</span>&gt;;   <span class="c">// the model's chosen args</span>
+}
+<span class="c">// the agent loop simply detects these in the assistant message:</span>
+<span class="k">const</span> toolCalls = message.content.<span class="f">filter</span>((c) =&gt; c.type === <span class="s">"toolCall"</span>);
+<span class="k">if</span> (toolCalls.length === <span class="n">0</span>) <span class="c">/* model is done — loop ends */</span>;</code></pre>
+    </div>
+
+    <p>And that last line is also <em>how the agent decides to stop</em>: there is no "finish" action. The run ends when a turn produces no tool calls &mdash; i.e. the model chose to answer in prose instead of acting. (A tool can also force a stop with <code>terminate: true</code>, Chapter 3.) Stopping is the absence of a decision to continue.</p>
+
+    <h3>Stages 3&ndash;4 — Validate and gate (preflight)</h3>
+
+    <p>Before a tool runs, the harness preflights it in <code>prepareToolCall</code> (Chapter 3): find the tool by name, run its optional <code>prepareArguments</code> shim (which repairs known model quirks &mdash; e.g. <code>edit</code> parsing an <code>edits</code> array the model sent as a JSON string), then validate against the TypeBox schema. Validation is coercing <em>and</em> forgiving in the right way: it produces a readable error that goes <em>back to the model</em> rather than throwing:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">ai/src/utils/validation.ts — validation errors are feedback, not crashes</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">export function</span> <span class="f">validateToolArguments</span>(tool, toolCall) {
+  <span class="k">const</span> args = <span class="f">structuredClone</span>(toolCall.arguments);
+  <span class="t">Value</span>.<span class="f">Convert</span>(tool.parameters, args);          <span class="c">// coerce "3" → 3, etc.</span>
+  <span class="k">const</span> validator = <span class="f">getCompiledValidator</span>(tool.parameters); <span class="c">// cached compiled check</span>
+  <span class="k">if</span> (!validator.<span class="f">Check</span>(args)) {
+    <span class="k">throw new</span> <span class="t">Error</span>(<span class="f">formatValidationErrors</span>(...)); <span class="c">// dotted paths + received args…</span>
+  }                                                <span class="c">// …caught by the loop → toolResult{isError:true}</span>
+  <span class="k">return</span> args;
+}</code></pre>
+    </div>
+
+    <p>Then the <code>beforeToolCall</code> gate runs (the harness's <code>tool_call</code> hook). It can <strong>block</strong> the call (returning an error result with a reason) or <strong>mutate the arguments</strong> in place. This is where permission systems, destructive-action confirmation, and plan mode live. Both validation failure and a block produce the same thing: a tool result with <code>isError: true</code>, fed back so the model can correct course.</p>
+
+    <h3>Stage 5 — Execute, stream, finalize</h3>
+
+    <p>The tool's <code>execute(toolCallId, args, signal, onUpdate)</code> runs (Chapter 3). It receives an <code>AbortSignal</code> for cancellation and an <code>onUpdate</code> callback to stream partial results (bash uses this to render output live). A thrown error is caught and converted to an error result &mdash; the model sees the message and retries. Then <code>afterToolCall</code> (the <code>tool_result</code> hook) can patch the content, flip <code>isError</code>, or set <code>terminate</code>. Batches run in parallel by default, sequentially if any tool demands it, with results re-ordered into the model's original call order so the transcript stays deterministic (Chapter 3).</p>
+
+    <h3>Stage 6 — The feedback loop: result drives the next decision</h3>
+
+    <p>The finalized result becomes a <code>toolResult</code> message, appended to context, and the loop turns again &mdash; now the model sees the outcome and decides what to do next. <em>This</em> is the mechanism behind "the agent figures it out": it isn't a plan executed top-to-bottom, it's a tight perceive-act-perceive cycle where each tool result reshapes the next choice.</p>
+
+    <div class="ascii">
+<pre>turn 1:  model → <span class="hl">read("config.ts")</span>            ──►  result: file contents
+turn 2:  model reads result → <span class="hl">grep("DB_URL")</span>   ──►  result: 3 matches
+turn 3:  model reads result → <span class="hl">edit(...)</span>          ──►  result: success
+turn 4:  model reads result → <span class="hl">bash("npm test")</span>   ──►  result: 1 failing
+turn 5:  model reads result → <span class="hl">edit(...)</span>          ──►  result: success
+turn 6:  model reads result → <span class="g">"Done. Fixed the off-by-one."</span>  <span class="mut">(no tool call → loop ends)</span></pre>
+    </div>
+
+    <h3>Custom tools enter the exact same pipeline</h3>
+
+    <p>An extension's tool (Chapter 12) is authored as a <code>ToolDefinition</code> and wrapped into the runtime <code>AgentTool</code> the loop consumes &mdash; the wrapper injects the extension's context so the tool can reach the UI, model, and abort signal:</p>
+
+    <div class="code">
+      <div class="code-head"><span class="code-dot"></span><span class="code-file">tools/tool-definition-wrapper.ts — every tool, built-in or custom, is an AgentTool</span><span class="code-lang">typescript</span></div>
+<pre><code><span class="k">export function</span> <span class="f">wrapToolDefinition</span>(definition, ctxFactory?): <span class="t">AgentTool</span> {
+  <span class="k">return</span> {
+    name: definition.name, label: definition.label,
+    description: definition.description, parameters: definition.parameters,
+    prepareArguments: definition.prepareArguments,
+    executionMode: definition.executionMode,
+    execute: (id, params, signal, onUpdate) =&gt;
+      definition.<span class="f">execute</span>(id, params, signal, onUpdate, ctxFactory?.()), <span class="c">// inject ctx</span>
+  };
+}</code></pre>
+    </div>
+
+    <p>So a custom <code>deploy</code> tool is advertised, decided, validated, gated, executed, and looped back through the identical six stages as <code>read</code> &mdash; which is why the seven built-ins aren't special-cased anywhere in the loop. The tool surface is uniform all the way down.</p>
+
+    <div class="callout insight">
+      <div class="callout-label">Who decides what</div>
+      <p>The recurring confusion about agents is collapsed by separating the two owners. The <strong>model</strong> decides <em>which</em> tool and <em>with what arguments</em> &mdash; an emergent choice you influence only through descriptions, guidelines, and which tools you put on the menu. The <strong>harness</strong> decides <em>everything deterministic</em>: what's advertised, whether the arguments are valid, whether the call is permitted, how it executes, how errors are reported, and when the loop stops. A good harness makes the model's job easy (clear tools, actionable errors) without pretending to do the model's job for it.</p>
+    </div>
+
+    <hr class="section-sep">
+
+    <!-- ════════════════════════════════════════════════ CHAPTER 11 (system prompt) -->
+    <span class="section-marker" id="c11">11 &mdash; Telling the Model Who It Is</span>
     <h2>System Prompt, Skills &amp; Context Files</h2>
 
     <p>The model's behavior is steered almost entirely by the system prompt and the context you inject. A coding agent's prompt is not a static string &mdash; it is assembled per turn from the active tools, the project's instruction files, available skills, and the current environment. The governing principle throughout is <span class="kt">progressive disclosure</span>: keep the always-on prompt small, and load detail on demand.</p>
@@ -1172,13 +1438,13 @@ description: Extract text and tables from PDF files. Use when the user
 
     <div class="callout insight">
       <div class="callout-label">Three flavors of "extra context", three injection strategies</div>
-      <p><strong>Context files</strong> (AGENTS.md) are <em>always</em> in the prompt &mdash; they're cheap and universally relevant. <strong>Skills</strong> put only a one-line teaser in the prompt and load the body on demand &mdash; many of them, each potentially large. <strong>Prompt templates</strong> aren't in the system prompt at all &mdash; they expand into the user turn when explicitly invoked. The harness matches the injection strategy to the cost and relevance of each resource. That discipline &mdash; never spend context tokens you don't have to &mdash; is the same instinct behind output truncation (Ch.8) and compaction (Ch.7).</p>
+      <p><strong>Context files</strong> (AGENTS.md) are <em>always</em> in the prompt &mdash; they're cheap and universally relevant. <strong>Skills</strong> put only a one-line teaser in the prompt and load the body on demand &mdash; many of them, each potentially large. <strong>Prompt templates</strong> aren't in the system prompt at all &mdash; they expand into the user turn when explicitly invoked. The harness matches the injection strategy to the cost and relevance of each resource. That discipline &mdash; never spend context tokens you don't have to &mdash; is the same instinct behind output truncation (Ch.9) and compaction (Ch.7).</p>
     </div>
 
     <hr class="section-sep">
 
     <!-- ════════════════════════════════════════════════ CHAPTER 10 -->
-    <span class="section-marker" id="c10">10 &mdash; A Self-Extensible Agent</span>
+    <span class="section-marker" id="c12">12 &mdash; A Self-Extensible Agent</span>
     <h2>Extensions &amp; the Hook System</h2>
 
     <p>Pi describes itself as "self-extensible," and it means it: the docs tell the agent to read its own extension documentation and write extensions on request. An extension is a single TypeScript file with a default-exported factory; it is loaded at runtime (no build step) and given one object, <code>pi: ExtensionAPI</code>, through which it registers tools, commands, keyboard shortcuts, CLI flags, message renderers, model providers, and &mdash; most powerfully &mdash; event handlers that hook the agent loop.</p>
@@ -1221,7 +1487,7 @@ description: Extract text and tables from PDF files. Use when the user
       </table>
     </div>
 
-    <p>So a "plan mode" extension can intercept <code>tool_call</code> and block any mutating tool until the user approves; a "rules" extension can inject project conventions via <code>before_agent_start</code>; a redaction extension can scrub secrets in <code>context</code>. The capability surface is broad: registered tools get full TUI renderers (Chapter 11), providers can add entire OAuth flows, and a shared <code>EventBus</code> lets extensions talk to each other.</p>
+    <p>So a "plan mode" extension can intercept <code>tool_call</code> and block any mutating tool until the user approves; a "rules" extension can inject project conventions via <code>before_agent_start</code>; a redaction extension can scrub secrets in <code>context</code>. The capability surface is broad: registered tools get full TUI renderers (Chapter 13), providers can add entire OAuth flows, and a shared <code>EventBus</code> lets extensions talk to each other.</p>
 
     <h3>Loading, ordering, and isolation</h3>
 
@@ -1237,7 +1503,7 @@ description: Extract text and tables from PDF files. Use when the user
     <hr class="section-sep">
 
     <!-- ════════════════════════════════════════════════ CHAPTER 11 -->
-    <span class="section-marker" id="c11">11 &mdash; Pixels From Strings</span>
+    <span class="section-marker" id="c13">13 &mdash; Pixels From Strings</span>
     <h2>The Terminal UI: Differential Rendering From Scratch</h2>
 
     <p>The interactive experience &mdash; streaming markdown, live diffs, a spinner, inline images, an editor with autocomplete, all redrawing smoothly &mdash; runs on Pi's own terminal UI library, <code>pi-tui</code> (<span class="fp">packages/tui</span>). No ncurses, no React-for-terminal. It is built on one idea: <strong>components produce flat arrays of styled strings, and a diff engine writes the minimum bytes to turn the previous frame into the next.</strong></p>
@@ -1290,7 +1556,7 @@ buffer += <span class="s">"\x1b[?2026l"</span>;                       <span clas
     <hr class="section-sep">
 
     <!-- ════════════════════════════════════════════════ CHAPTER 12 -->
-    <span class="section-marker" id="c12">12 &mdash; Four Faces, One Engine</span>
+    <span class="section-marker" id="c14">14 &mdash; Four Faces, One Engine</span>
     <h2>Modes: Interactive, Print, RPC, SDK</h2>
 
     <p>The same <code>AgentSession</code> drives four very different front-ends. This is the payoff of the strict layering: because the agent loop only emits events and the session exposes a clean method surface (<code>prompt</code>, <code>steer</code>, <code>setModel</code>, <code>fork</code>, <code>compact</code>…), you can wrap it in a terminal UI, a one-shot CLI, a JSON-RPC server, or an in-process library without changing the engine.</p>
@@ -1313,7 +1579,7 @@ buffer += <span class="s">"\x1b[?2026l"</span>;                       <span clas
       <table class="dtable">
         <thead><tr><th>Mode</th><th>For</th><th>Output</th><th>Prompt semantics</th></tr></thead>
         <tbody>
-          <tr><td><strong>interactive</strong></td><td>humans at a terminal</td><td>the full TUI (Ch.11)</td><td>REPL loop</td></tr>
+          <tr><td><strong>interactive</strong></td><td>humans at a terminal</td><td>the full TUI (Ch.13)</td><td>REPL loop</td></tr>
           <tr><td><strong>print</strong> (<code>-p</code>)</td><td>scripts, pipelines</td><td>final assistant text to stdout</td><td>run to completion, serially</td></tr>
           <tr><td><strong>json</strong></td><td>tools wanting structure</td><td>every event as one JSON line</td><td>run to completion, streamed</td></tr>
           <tr><td><strong>rpc</strong></td><td>other languages, IDEs</td><td>JSONL request/response + events</td><td>fire-and-forget, ack on preflight</td></tr>
@@ -1347,7 +1613,7 @@ buffer += <span class="s">"\x1b[?2026l"</span>;                       <span clas
     <hr class="section-sep">
 
     <!-- ════════════════════════════════════════════════ CHAPTER 13 -->
-    <span class="section-marker" id="c13">13 &mdash; What Makes It Hold Together</span>
+    <span class="section-marker" id="c15">15 &mdash; What Makes It Hold Together</span>
     <h2>The Design Principles</h2>
 
     <p>We have walked the whole machine bottom to top. Step back and the same handful of principles recur at every layer &mdash; and they are what separate a harness that survives real use from a demo that falls over. If you take nothing else from this dissection, take these.</p>
